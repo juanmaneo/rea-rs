@@ -139,9 +139,9 @@ impl AnalysisError {
     ) -> Self {
         adapter.user_message = Some(PROVIDER_CLEANUP_MESSAGE.to_owned());
         let mut error = Self::new(AnalysisErrorKind::ProviderAdapter(adapter));
-        error.diagnostics = Some(diagnostics);
-        error.cleanup.resources = Some(resources.into_iter().map(Into::into).collect());
-        error.cleanup.status = CleanupStatus::Pending(CleanupHandle::pending());
+        error.0.diagnostics = Some(diagnostics);
+        error.0.cleanup.resources = Some(resources.into_iter().map(Into::into).collect());
+        error.0.cleanup.status = CleanupStatus::Pending(CleanupHandle::pending());
         error
     }
 
@@ -149,16 +149,16 @@ impl AnalysisError {
     /// cleanup is pending until [`AnalysisError::resolve_cleanup`].
     #[must_use]
     pub fn with_cleanup(mut self, observation: CleanupObservation) -> Self {
-        self.cleanup.observation = Some(observation);
-        if !matches!(self.cleanup.status, CleanupStatus::Pending(_)) {
-            self.cleanup.status = CleanupStatus::Pending(CleanupHandle::pending());
+        self.0.cleanup.observation = Some(observation);
+        if !matches!(self.0.cleanup.status, CleanupStatus::Pending(_)) {
+            self.0.cleanup.status = CleanupStatus::Pending(CleanupHandle::pending());
         }
         self
     }
 
     /// Whether cleanup remains unconfirmed.
     pub fn cleanup_incomplete(&self) -> bool {
-        match &self.cleanup.status {
+        match &self.0.cleanup.status {
             CleanupStatus::Complete => false,
             CleanupStatus::Pending(handle) => handle.is_pending(),
             CleanupStatus::Dependent(dependencies) => {
@@ -169,13 +169,13 @@ impl AnalysisError {
 
     /// The cleanup observation, retained as history after completion.
     pub fn cleanup_observation(&self) -> Option<&CleanupObservation> {
-        self.cleanup.observation.as_ref()
+        self.0.cleanup.observation.as_ref()
     }
 
     /// Currently attributed resources. Live dependencies own attribution;
     /// otherwise the producer's resources apply.
     pub fn cleanup_resources(&self) -> Vec<String> {
-        match &self.cleanup.status {
+        match &self.0.cleanup.status {
             CleanupStatus::Dependent(dependencies) => unique(
                 dependencies
                     .iter()
@@ -183,11 +183,13 @@ impl AnalysisError {
                     .flat_map(Self::cleanup_resources),
             ),
             CleanupStatus::Complete | CleanupStatus::Pending(_) => self
+                .0
                 .cleanup
                 .resources
                 .clone()
                 .or_else(|| {
-                    self.cleanup
+                    self.0
+                        .cleanup
                         .observation
                         .as_ref()
                         .map(|observation| observation.resources.clone())
@@ -199,7 +201,7 @@ impl AnalysisError {
     /// Handle that resolves this error's own pending cleanup, shared by its clones.
     /// Absent when cleanup is complete or follows dependencies.
     pub fn cleanup_handle(&self) -> Option<CleanupHandle> {
-        match &self.cleanup.status {
+        match &self.0.cleanup.status {
             CleanupStatus::Pending(handle) => Some(handle.clone()),
             CleanupStatus::Complete | CleanupStatus::Dependent(_) => None,
         }
@@ -208,7 +210,7 @@ impl AnalysisError {
     /// Clear this error's own pending cleanup after its owning resource
     /// confirms success. A composition waiting on dependencies is unaffected.
     pub fn resolve_cleanup(&self) {
-        if let CleanupStatus::Pending(handle) = &self.cleanup.status {
+        if let CleanupStatus::Pending(handle) = &self.0.cleanup.status {
             handle.resolve();
         }
     }
@@ -216,7 +218,7 @@ impl AnalysisError {
     /// Caller retry for the live cleanup; absent once cleanup completes.
     pub fn cleanup_retry(&self) -> Option<CleanupRetry> {
         if self.cleanup_incomplete() {
-            self.cleanup.retry
+            self.0.cleanup.retry
         } else {
             None
         }
@@ -225,7 +227,7 @@ impl AnalysisError {
     /// Bind only from the owner retaining every reported resource for this retry.
     #[must_use]
     pub fn bind_cleanup_retry(mut self, retry: CleanupRetry) -> Self {
-        self.cleanup.retry = Some(retry);
+        self.0.cleanup.retry = Some(retry);
         self
     }
 
@@ -244,7 +246,7 @@ impl AnalysisError {
             return self;
         }
         let pending = dependencies.into_iter().filter(Self::cleanup_incomplete);
-        match &mut self.cleanup.status {
+        match &mut self.0.cleanup.status {
             CleanupStatus::Dependent(existing) => existing.extend(pending),
             status => {
                 let pending: Vec<_> = pending.collect();
@@ -270,7 +272,7 @@ impl AnalysisError {
         cleanup: &AnalysisError,
         operation: impl Into<String>,
     ) -> Self {
-        let provider_id = match &cleanup.kind {
+        let provider_id = match &cleanup.0.kind {
             AnalysisErrorKind::ProviderAdapter(adapter) => adapter.provider_id.clone(),
             _ => "rea".to_owned(),
         };
@@ -279,6 +281,7 @@ impl AnalysisError {
         let resolved_primary = primary.resolved();
         let guidance = ContinuingCallerGuidance {
             user_message: resolved_primary
+                .0
                 .continuing_caller_guidance
                 .as_ref()
                 .and_then(|guidance| guidance.user_message.clone()),
@@ -289,7 +292,7 @@ impl AnalysisError {
         adapter.user_message = Some(resolved_primary.outcome_user_message());
         adapter.remediation_action = Some(remediation);
 
-        let reason = cleanup.cleanup.observation.as_ref().map_or_else(
+        let reason = cleanup.0.cleanup.observation.as_ref().map_or_else(
             || cleanup.user_message(CallerLifetime::Invocation),
             |observation| observation.reason.clone(),
         );
@@ -309,7 +312,7 @@ impl AnalysisError {
                     "primary_error",
                     ChildFailure {
                         error: &primary,
-                        include_captured_output: primary.captured_output.is_none(),
+                        include_captured_output: primary.0.captured_output.is_none(),
                     },
                 ),
                 (
@@ -327,15 +330,17 @@ impl AnalysisError {
             .with_cleanup(CleanupObservation { reason, resources })
             .with_child_failure_diagnostics(children);
         if guidance.user_message.is_some() || guidance.remediation_action.is_some() {
-            composed.continuing_caller_guidance = Some(guidance);
+            composed.0.continuing_caller_guidance = Some(guidance);
         }
         composed
+            .0
             .captured_output
-            .clone_from(&primary.captured_output);
+            .clone_from(&primary.0.captured_output);
         composed
+            .0
             .partial_observation
-            .clone_from(&primary.partial_observation);
-        composed.cleanup_primary = Some(Box::new(primary));
+            .clone_from(&primary.0.partial_observation);
+        composed.0.cleanup_primary = Some(primary);
         composed
     }
 
@@ -361,15 +366,15 @@ impl AnalysisError {
         };
         let primary = failure.primary_mut();
         let cancelled =
-            |error: &AnalysisError| matches!(error.kind, AnalysisErrorKind::Cancelled(_));
-        if !cancelled(primary) && !primary.secondary_failures.iter().any(cancelled) {
+            |error: &AnalysisError| matches!(error.0.kind, AnalysisErrorKind::Cancelled(_));
+        if !cancelled(primary) && !primary.0.secondary_failures.iter().any(cancelled) {
             primary.retain_secondary_failure(cancellation, None);
         }
         failure
     }
 
     fn primary_mut(&mut self) -> &mut Self {
-        match self.cleanup_primary {
+        match self.0.cleanup_primary {
             Some(ref mut primary) => primary.primary_mut(),
             None => self,
         }

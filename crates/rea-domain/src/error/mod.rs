@@ -252,8 +252,14 @@ impl WorkflowUnknownPublication {
 }
 
 /// One expected analysis failure with the context that must survive projection.
+///
+/// The state is boxed so `Result<_, AnalysisError>` stays pointer-sized on
+/// the success path.
 #[derive(Debug, Clone)]
-pub struct AnalysisError {
+pub struct AnalysisError(Box<AnalysisErrorState>);
+
+#[derive(Debug, Clone)]
+struct AnalysisErrorState {
     kind: AnalysisErrorKind,
     diagnostics: Option<Map<String, Value>>,
     invocation_diagnostics: Option<Map<String, Value>>,
@@ -262,21 +268,22 @@ pub struct AnalysisError {
     partial_observation: Option<Value>,
     workflow_unknown_publication: Option<WorkflowUnknownPublication>,
     limit: Option<AnalysisSettingLimit>,
-    cleanup_primary: Option<Box<AnalysisError>>,
+    cleanup_primary: Option<AnalysisError>,
     secondary_failures: Vec<AnalysisError>,
     cleanup: cleanup::CleanupState,
 }
 
 impl fmt::Display for AnalysisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.kind.fmt(f)
+        self.0.kind.fmt(f)
     }
 }
 
 impl std::error::Error for AnalysisError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.cleanup_primary
-            .as_deref()
+        self.0
+            .cleanup_primary
+            .as_ref()
             .map(|primary| primary as &(dyn std::error::Error + 'static))
     }
 }
@@ -318,7 +325,7 @@ from_payload! {
 impl AnalysisError {
     /// A failure with no lifecycle context.
     pub fn new(kind: AnalysisErrorKind) -> Self {
-        Self {
+        Self(Box::new(AnalysisErrorState {
             kind,
             diagnostics: None,
             invocation_diagnostics: None,
@@ -330,7 +337,7 @@ impl AnalysisError {
             cleanup_primary: None,
             secondary_failures: Vec::new(),
             cleanup: cleanup::CleanupState::default(),
-        }
+        }))
     }
 
     /// Caller input failed parsing; `issues` name each rejected argument.
@@ -482,7 +489,7 @@ impl AnalysisError {
     /// Producer-owned, caller-safe diagnostics retained through projection.
     #[must_use]
     pub fn with_diagnostics(mut self, diagnostics: Map<String, Value>) -> Self {
-        self.diagnostics = Some(diagnostics);
+        self.0.diagnostics = Some(diagnostics);
         self
     }
 
@@ -490,60 +497,61 @@ impl AnalysisError {
     /// embedded child projects differently for that lifetime.
     #[must_use]
     pub fn with_invocation_diagnostics(mut self, diagnostics: Map<String, Value>) -> Self {
-        self.invocation_diagnostics = Some(diagnostics);
+        self.0.invocation_diagnostics = Some(diagnostics);
         self
     }
 
     /// Diagnostics embedding child failures, from [`child_failure_diagnostics`].
     #[must_use]
     pub fn with_child_failure_diagnostics(mut self, children: ChildFailureDiagnostics) -> Self {
-        self.diagnostics = Some(children.diagnostics);
-        self.invocation_diagnostics = children.invocation_diagnostics;
+        self.0.diagnostics = Some(children.diagnostics);
+        self.0.invocation_diagnostics = children.invocation_diagnostics;
         self
     }
 
     /// Guidance that holds only for a continuing caller.
     #[must_use]
     pub fn with_continuing_caller_guidance(mut self, guidance: ContinuingCallerGuidance) -> Self {
-        self.continuing_caller_guidance = Some(guidance);
+        self.0.continuing_caller_guidance = Some(guidance);
         self
     }
 
     /// Command output retained with the failure.
     #[must_use]
     pub fn with_captured_output(mut self, output: CapturedOutput) -> Self {
-        self.captured_output = Some(output);
+        self.0.captured_output = Some(output);
         self
     }
 
     /// Evidence collected before the failure, as JSON.
     #[must_use]
     pub fn with_partial_observation(mut self, observation: Value) -> Self {
-        self.partial_observation = Some(observation);
+        self.0.partial_observation = Some(observation);
         self
     }
 
     /// Bind the accepted setting at its producing boundary.
     #[must_use]
     pub fn with_limit(mut self, limit: AnalysisSettingLimit) -> Self {
-        self.limit = Some(limit);
+        self.0.limit = Some(limit);
         self
     }
 
     /// Typed primary retained when a later lifecycle failure composes this error.
     #[must_use]
     pub fn with_cleanup_primary(mut self, primary: AnalysisError) -> Self {
-        self.cleanup_primary = Some(Box::new(primary));
+        self.0.cleanup_primary = Some(primary);
         self
     }
 
     /// Merge diagnostic facts without replacing the typed error; invocation
     /// diagnostics receive them only when already present.
     pub fn retain_diagnostics(&mut self, diagnostics: Map<String, Value>) {
-        if let Some(invocation) = &mut self.invocation_diagnostics {
+        if let Some(invocation) = &mut self.0.invocation_diagnostics {
             invocation.extend(diagnostics.clone());
         }
-        self.diagnostics
+        self.0
+            .diagnostics
             .get_or_insert_with(Map::new)
             .extend(diagnostics);
     }
@@ -558,86 +566,89 @@ impl AnalysisError {
         if let Some(diagnostics) = diagnostics {
             self.retain_diagnostics(diagnostics);
         }
-        self.secondary_failures.push(failure);
+        self.0.secondary_failures.push(failure);
     }
 
     /// Retain a completed observation when a later step fails; the first wins.
     pub fn retain_partial_observation(&mut self, observation: Value) {
-        self.partial_observation.get_or_insert(observation);
+        self.0.partial_observation.get_or_insert(observation);
     }
 
     /// Preserve the committed prefix when automatic question publication
     /// stops; the first wins.
     pub fn retain_workflow_unknown_publication(&mut self, publication: WorkflowUnknownPublication) {
-        self.workflow_unknown_publication.get_or_insert(publication);
+        self.0
+            .workflow_unknown_publication
+            .get_or_insert(publication);
     }
 
     /// The typed failure.
     pub fn kind(&self) -> &AnalysisErrorKind {
-        &self.kind
+        &self.0.kind
     }
 
     /// Stable tag.
     pub fn tag(&self) -> AnalysisErrorTag {
-        self.kind.tag()
+        self.0.kind.tag()
     }
 
     /// Producer diagnostics.
     pub fn diagnostics(&self) -> Option<&Map<String, Value>> {
-        self.diagnostics.as_ref()
+        self.0.diagnostics.as_ref()
     }
 
     /// Diagnostics recorded for a caller with `lifetime`.
     pub fn diagnostics_for(&self, lifetime: CallerLifetime) -> Option<&Map<String, Value>> {
         match lifetime {
             CallerLifetime::Invocation => self
+                .0
                 .invocation_diagnostics
                 .as_ref()
-                .or(self.diagnostics.as_ref()),
-            CallerLifetime::Continuing => self.diagnostics.as_ref(),
+                .or(self.0.diagnostics.as_ref()),
+            CallerLifetime::Continuing => self.0.diagnostics.as_ref(),
         }
     }
 
     /// Retained command output.
     pub fn captured_output(&self) -> Option<&CapturedOutput> {
-        self.captured_output.as_ref()
+        self.0.captured_output.as_ref()
     }
 
     /// Retained partial observation.
     pub fn partial_observation(&self) -> Option<&Value> {
-        self.partial_observation.as_ref()
+        self.0.partial_observation.as_ref()
     }
 
     /// Bound setting limit.
     pub fn limit(&self) -> Option<&AnalysisSettingLimit> {
-        self.limit.as_ref()
+        self.0.limit.as_ref()
     }
 
     /// Continuing-caller guidance.
     pub fn continuing_caller_guidance(&self) -> Option<&ContinuingCallerGuidance> {
-        self.continuing_caller_guidance.as_ref()
+        self.0.continuing_caller_guidance.as_ref()
     }
 
     /// Retained workflow publication prefix.
     pub fn workflow_unknown_publication(&self) -> Option<&WorkflowUnknownPublication> {
-        self.workflow_unknown_publication.as_ref()
+        self.0.workflow_unknown_publication.as_ref()
     }
 
     /// Typed primary of a cleanup composition.
     pub fn cleanup_primary(&self) -> Option<&AnalysisError> {
-        self.cleanup_primary.as_deref()
+        self.0.cleanup_primary.as_ref()
     }
 
     /// Later typed failures retained beside the primary.
     pub fn secondary_failures(&self) -> &[AnalysisError] {
-        &self.secondary_failures
+        &self.0.secondary_failures
     }
 
     /// Confirmed cleanup reveals the typed primary; unresolved ownership stays visible.
     pub fn resolved(&self) -> &AnalysisError {
         let mut error = self;
         while !error.cleanup_incomplete()
-            && let Some(primary) = error.cleanup_primary.as_deref()
+            && let Some(primary) = error.0.cleanup_primary.as_ref()
         {
             error = primary;
         }
@@ -647,7 +658,7 @@ impl AnalysisError {
     /// Original operation semantics, distinct from any cleanup envelope.
     pub fn primary(&self) -> &AnalysisError {
         let mut error = self;
-        while let Some(primary) = error.cleanup_primary.as_deref() {
+        while let Some(primary) = error.0.cleanup_primary.as_ref() {
             error = primary;
         }
         error
@@ -656,7 +667,7 @@ impl AnalysisError {
     /// Upstream computes capability retryability at construction: a refusal
     /// raised with incomplete cleanup is never retryable.
     pub(crate) fn capability_retryable(&self) -> bool {
-        matches!(&self.kind, AnalysisErrorKind::CapabilityUnavailable(error) if error.retryable)
-            && self.cleanup.observation.is_none()
+        matches!(&self.0.kind, AnalysisErrorKind::CapabilityUnavailable(error) if error.retryable)
+            && self.0.cleanup.observation.is_none()
     }
 }

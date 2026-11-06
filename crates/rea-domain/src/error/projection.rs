@@ -314,15 +314,15 @@ impl AnalysisError {
     /// Every lifetime-dependent input the projection reads lies on this chain.
     fn projection_depends_on_lifetime(&self) -> bool {
         self.cleanup_chain().any(|node| {
-            node.limit.is_some()
-                || node.continuing_caller_guidance.is_some()
-                || node.invocation_diagnostics.is_some()
-                || node.workflow_unknown_publication.is_some()
+            node.0.limit.is_some()
+                || node.0.continuing_caller_guidance.is_some()
+                || node.0.invocation_diagnostics.is_some()
+                || node.0.workflow_unknown_publication.is_some()
         })
     }
 
     fn cleanup_chain(&self) -> impl Iterator<Item = &AnalysisError> {
-        std::iter::successors(Some(self), |node| node.cleanup_primary.as_deref())
+        std::iter::successors(Some(self), |node| node.0.cleanup_primary.as_ref())
     }
 
     fn project_with(
@@ -334,7 +334,7 @@ impl AnalysisError {
         let error = composed.resolved();
         let diagnostics = error
             .cleanup_chain()
-            .find(|node| node.diagnostics.is_some() || node.cleanup_primary.is_none())
+            .find(|node| node.0.diagnostics.is_some() || node.0.cleanup_primary.is_none())
             .and_then(|source| source.diagnostics_for(lifetime));
         let cleanup_history = if ptr::eq(composed, error) {
             None
@@ -342,13 +342,15 @@ impl AnalysisError {
             composed.diagnostics_for(lifetime)
         };
         let captured_output = composed
+            .0
             .captured_output
             .as_ref()
-            .or(error.captured_output.as_ref());
+            .or(error.0.captured_output.as_ref());
         let partial_observation = composed
+            .0
             .partial_observation
             .as_ref()
-            .or(error.partial_observation.as_ref());
+            .or(error.0.partial_observation.as_ref());
         let primary = error.primary();
         let underlying = primary.underlying_code();
         let incomplete = error.cleanup_incomplete();
@@ -359,9 +361,10 @@ impl AnalysisError {
         };
         let primary_details = primary.primary_details();
         let publication = composed
+            .0
             .workflow_unknown_publication
             .as_ref()
-            .or(primary.workflow_unknown_publication.as_ref());
+            .or(primary.0.workflow_unknown_publication.as_ref());
 
         let mut details = primary_details.clone().unwrap_or_default();
         if let Some(publication) = publication {
@@ -370,7 +373,7 @@ impl AnalysisError {
                 publication.to_value(lifetime),
             );
         }
-        if let Some(limit) = &primary.limit {
+        if let Some(limit) = &primary.0.limit {
             details.insert("limit".into(), limit.to_value(lifetime));
         }
         if let Some(diagnostics) = diagnostics {
@@ -385,7 +388,7 @@ impl AnalysisError {
         if incomplete {
             details.insert("cleanup".into(), "incomplete".into());
             details.insert("resources".into(), error.cleanup_resources().into());
-            if let Some(observation) = &error.cleanup.observation {
+            if let Some(observation) = &error.0.cleanup.observation {
                 details.insert("cleanup_reason".into(), observation.reason.clone().into());
             }
             let execution_failure = primary_details
@@ -422,7 +425,7 @@ impl AnalysisError {
         let retryable = code.retryable()
             || error.capability_retryable()
             || (code == ErrorCode::ResourceConstraint
-                && matches!(&error.kind, Kind::ResourceConstraint(resource)
+                && matches!(&error.0.kind, Kind::ResourceConstraint(resource)
                     if resource.recovery.retryable().unwrap_or(resource.resource == ResourceKind::Capacity)));
 
         AnalysisErrorProjection {
@@ -437,7 +440,7 @@ impl AnalysisError {
     }
 
     fn error_recovery(&self) -> Option<ErrorRecovery> {
-        match &self.kind {
+        match &self.0.kind {
             Kind::Input(error) if !error.conforms_to_input_contract => {
                 Some(ErrorRecovery::InspectInputContract {
                     operation: error.operation.clone(),
@@ -452,7 +455,7 @@ impl AnalysisError {
     }
 
     fn underlying_code(&self) -> ErrorCode {
-        match &self.kind {
+        match &self.0.kind {
             Kind::ArtifactOperation(error) => match error.reason {
                 ArtifactOperationReason::Integrity if error.integrity.is_some() => {
                     ErrorCode::ArtifactIntegrityMismatch
@@ -495,7 +498,7 @@ impl AnalysisError {
         let mut put = |key: &str, value: Value| {
             details.insert(key.to_owned(), value);
         };
-        match &self.kind {
+        match &self.0.kind {
             Kind::UnsupportedTarget(error) => {
                 put("operation", error.operation.clone().into());
                 put("path", error.path.clone().into());
@@ -528,7 +531,7 @@ impl AnalysisError {
             Kind::Output(error) => {
                 put("operation", error.operation.clone().into());
                 put("reason", error.reason.clone().into());
-                if let Some(diagnostics) = &self.diagnostics {
+                if let Some(diagnostics) = &self.0.diagnostics {
                     put("diagnostics", Value::Object(diagnostics.clone()));
                 }
             }
@@ -614,7 +617,8 @@ impl AnalysisError {
                     "cleanup",
                     if incomplete { "incomplete" } else { "complete" }.into(),
                 );
-                if let Some(observation) = self.cleanup.observation.as_ref().filter(|_| incomplete)
+                if let Some(observation) =
+                    self.0.cleanup.observation.as_ref().filter(|_| incomplete)
                 {
                     put("cleanup_reason", observation.reason.clone().into());
                     put("resources", observation.resources.clone().into());
@@ -625,6 +629,7 @@ impl AnalysisError {
                 put("operation", error.operation.clone().into());
                 put("timeout_ms", error.timeout_ms.into());
                 if let Some(observation) = self
+                    .0
                     .cleanup
                     .observation
                     .as_ref()

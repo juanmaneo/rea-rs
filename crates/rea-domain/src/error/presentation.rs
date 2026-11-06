@@ -45,6 +45,7 @@ impl AnalysisError {
         let error = self.resolved();
         let outcome = error.outcome_user_message();
         let continuing = error
+            .0
             .continuing_caller_guidance
             .as_ref()
             .and_then(|guidance| guidance.user_message.as_deref());
@@ -63,6 +64,7 @@ impl AnalysisError {
         let error = self.resolved();
         if lifetime == CallerLifetime::Continuing
             && let Some(action) = error
+                .0
                 .continuing_caller_guidance
                 .as_ref()
                 .and_then(|guidance| guidance.remediation_action.as_ref())
@@ -78,7 +80,7 @@ impl AnalysisError {
     /// Category of the original operation's failure, unchanged by cleanup.
     pub fn category(&self) -> ErrorCategory {
         let error = self.primary();
-        match &error.kind {
+        match &error.0.kind {
             Kind::CapabilityUnavailable(_) if error.capability_retryable() => {
                 ErrorCategory::Unavailable
             }
@@ -122,7 +124,7 @@ impl AnalysisError {
 
     /// The outcome every caller receives, without continuing-caller guidance.
     pub(super) fn outcome_user_message(&self) -> String {
-        match &self.kind {
+        match &self.0.kind {
             Kind::UnsupportedTarget(error) => return error.message(),
             Kind::ResourceConstraint(error) => return error.reason.clone(),
             Kind::AccessDenied(_) => {
@@ -149,7 +151,7 @@ impl AnalysisError {
         if let Some(message) = self.producer_user_message() {
             return message.to_owned();
         }
-        match &self.kind {
+        match &self.0.kind {
             Kind::CapabilityUnavailable(_) if self.capability_retryable() => {
                 "Required runtime controls are unavailable for this attempt.".to_owned()
             }
@@ -176,7 +178,7 @@ impl AnalysisError {
 
     /// Upstream's generic `userMessage` override for the tags that carry one.
     fn producer_user_message(&self) -> Option<&str> {
-        match &self.kind {
+        match &self.0.kind {
             Kind::Output(error) => error.user_message.as_deref(),
             Kind::CapabilityUnavailable(error) => error.user_message.as_deref(),
             Kind::ProviderAdapter(error) => error.user_message.as_deref(),
@@ -197,7 +199,7 @@ impl AnalysisError {
     }
 
     fn specific_remediation_action(&self) -> Option<String> {
-        match &self.kind {
+        match &self.0.kind {
             Kind::ProviderAdapter(error) => error.remediation_action.clone(),
             Kind::CapabilityUnavailable(error) => error.remediation_action.clone().or_else(|| {
                 self.capability_retryable().then(|| {
