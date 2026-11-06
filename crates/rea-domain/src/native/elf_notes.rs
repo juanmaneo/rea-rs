@@ -9,8 +9,11 @@
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 
 use crate::digest::Sha256Digest;
+use crate::error::InputIssue;
+use crate::input::InputObject;
 
 /// Hard ceiling on the caller-selected input read budget (512 MiB).
 pub const MAX_INSPECT_ELF_NOTE_FILE_BYTES: u64 = 536_870_912;
@@ -27,29 +30,17 @@ pub const DEFAULT_INSPECT_ELF_NOTE_ENTRIES: u64 = 32;
 
 /// Caller input for `inspect_elf_notes`.
 ///
-/// Deserialization applies the upstream defaults and rejects unknown members;
-/// range admission is [`InspectElfNotesInput::validate`]. Path admission
-/// (`localPathStringSchema`) belongs to the shared local-path contract.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// [`InspectElfNotesInput::parse`] is the only admission from raw caller
+/// arguments; it applies the upstream defaults, ranges, and strictness.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InspectElfNotesInput {
     /// Absolute filesystem path to an ELF image.
     pub path: String,
     /// Maximum stable artifact bytes to read.
-    #[serde(default = "default_max_file_bytes")]
     pub max_file_bytes: u64,
     /// Maximum note entries to examine across every table; exceeding the
     /// budget fails without partial success.
-    #[serde(default = "default_max_entries")]
     pub max_entries: u64,
-}
-
-const fn default_max_file_bytes() -> u64 {
-    DEFAULT_INSPECT_ELF_NOTE_FILE_BYTES
-}
-
-const fn default_max_entries() -> u64 {
-    DEFAULT_INSPECT_ELF_NOTE_ENTRIES
 }
 
 impl InspectElfNotesInput {
@@ -62,98 +53,32 @@ impl InspectElfNotesInput {
         }
     }
 
-    /// Range issues in input member order; empty when the budgets are admitted.
-    pub fn validate(&self) -> Vec<InspectElfNotesInputIssue> {
-        [
-            (
-                InspectElfNotesInputField::MaxFileBytes,
-                self.max_file_bytes,
-                MIN_INSPECT_ELF_NOTE_FILE_BYTES,
-                MAX_INSPECT_ELF_NOTE_FILE_BYTES,
-            ),
-            (
-                InspectElfNotesInputField::MaxEntries,
-                self.max_entries,
-                MIN_INSPECT_ELF_NOTE_ENTRIES,
-                MAX_INSPECT_ELF_NOTE_ENTRIES,
-            ),
-        ]
-        .into_iter()
-        .filter_map(|(field, value, minimum, maximum)| {
-            let bound = if value < minimum {
-                InputRangeBound::Minimum(minimum)
-            } else if value > maximum {
-                InputRangeBound::Maximum(maximum)
-            } else {
-                return None;
-            };
-            Some(InspectElfNotesInputIssue { field, bound })
-        })
-        .collect()
-    }
-}
-
-/// A range-checked `inspect_elf_notes` input member.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InspectElfNotesInputField {
-    /// `max_file_bytes`.
-    MaxFileBytes,
-    /// `max_entries`.
-    MaxEntries,
-}
-
-impl InspectElfNotesInputField {
-    /// The input member name, which is the issue path's only segment.
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::MaxFileBytes => "max_file_bytes",
-            Self::MaxEntries => "max_entries",
-        }
-    }
-}
-
-/// The violated inclusive bound of an out-of-range input value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InputRangeBound {
-    /// The value is below this minimum.
-    Minimum(u64),
-    /// The value is above this maximum.
-    Maximum(u64),
-}
-
-/// One out-of-range input member.
-///
-/// Upstream projects these zod issues as
-/// `{ path: [field], reason: "out_of_range", minimum | maximum }`
-/// (`upstream:src/domain/inputIssueProjection.ts`); [`fmt::Display`] renders
-/// the zod issue message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InspectElfNotesInputIssue {
-    /// The offending input member.
-    pub field: InspectElfNotesInputField,
-    /// The violated bound.
-    pub bound: InputRangeBound,
-}
-
-impl InspectElfNotesInputIssue {
-    /// The projected issue reason.
-    pub const REASON: &'static str = "out_of_range";
-
-    /// The issue path within the input.
-    pub const fn path(&self) -> [&'static str; 1] {
-        [self.field.name()]
-    }
-}
-
-impl fmt::Display for InspectElfNotesInputIssue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.bound {
-            InputRangeBound::Minimum(minimum) => {
-                write!(f, "Too small: expected number to be >={minimum}")
-            }
-            InputRangeBound::Maximum(maximum) => {
-                write!(f, "Too big: expected number to be <={maximum}")
-            }
+    /// Admit raw caller arguments (`inspectElfNotesInputSchema`); `None`
+    /// means no arguments were supplied.
+    pub fn parse(raw: Option<&Value>) -> Result<Self, Vec<InputIssue>> {
+        let mut object = InputObject::new(raw)?;
+        let path = object.local_path("path");
+        let max_file_bytes = object.integer(
+            "max_file_bytes",
+            MIN_INSPECT_ELF_NOTE_FILE_BYTES,
+            MAX_INSPECT_ELF_NOTE_FILE_BYTES,
+            DEFAULT_INSPECT_ELF_NOTE_FILE_BYTES,
+        );
+        let max_entries = object.integer(
+            "max_entries",
+            MIN_INSPECT_ELF_NOTE_ENTRIES,
+            MAX_INSPECT_ELF_NOTE_ENTRIES,
+            DEFAULT_INSPECT_ELF_NOTE_ENTRIES,
+        );
+        object.finish()?;
+        match (path, max_file_bytes, max_entries) {
+            (Some(path), Some(max_file_bytes), Some(max_entries)) => Ok(Self {
+                path,
+                max_file_bytes,
+                max_entries,
+            }),
+            // `finish` reports an issue for every member that produced `None`.
+            _ => Err(Vec::new()),
         }
     }
 }
@@ -614,66 +539,111 @@ pub struct ElfNotes {
 mod tests {
     use super::*;
 
+    use crate::error::InputIssueReason;
+    use serde_json::{Number, json};
+
+    fn parse(raw: Value) -> Result<InspectElfNotesInput, Vec<InputIssue>> {
+        InspectElfNotesInput::parse(Some(&raw))
+    }
+
+    fn range(key: &str, minimum: Option<u64>, maximum: Option<u64>) -> InputIssue {
+        InputIssue::new([key], InputIssueReason::OutOfRange)
+            .with_range(minimum.map(Number::from), maximum.map(Number::from))
+    }
+
     #[test]
     fn input_defaults_and_member_order() {
-        let input: InspectElfNotesInput =
-            serde_json::from_str(r#"{"path":"/artifacts/app"}"#).unwrap();
+        let input = parse(json!({"path": "/artifacts/app"})).unwrap();
         assert_eq!(input, InspectElfNotesInput::new("/artifacts/app"));
-        assert!(input.validate().is_empty());
         assert_eq!(
             serde_json::to_string(&input).unwrap(),
             r#"{"path":"/artifacts/app","max_file_bytes":67108864,"max_entries":32}"#
         );
-        assert!(
-            serde_json::from_str::<InspectElfNotesInput>(r#"{"path":"/a","extra":1}"#).is_err()
-        );
     }
 
     #[test]
-    fn input_validation_reports_each_violated_bound() {
-        let mut input = InspectElfNotesInput::new("/a");
-        input.max_file_bytes = 63;
-        input.max_entries = 257;
-        let issues = input.validate();
+    fn input_parsing_reports_each_issue_in_shape_order_then_unknown_members() {
         assert_eq!(
-            issues,
-            [
-                InspectElfNotesInputIssue {
-                    field: InspectElfNotesInputField::MaxFileBytes,
-                    bound: InputRangeBound::Minimum(64),
-                },
-                InspectElfNotesInputIssue {
-                    field: InspectElfNotesInputField::MaxEntries,
-                    bound: InputRangeBound::Maximum(256),
-                },
-            ]
-        );
-        assert_eq!(issues[0].path(), ["max_file_bytes"]);
-        assert_eq!(
-            issues[0].to_string(),
-            "Too small: expected number to be >=64"
+            parse(json!({"zeta": 1, "max_entries": 257, "max_file_bytes": 63, "path": "/a"})),
+            Err(vec![
+                range("max_file_bytes", Some(64), None),
+                range("max_entries", None, Some(256)),
+                InputIssue::new(["zeta"], InputIssueReason::UnknownArgument),
+            ])
         );
         assert_eq!(
-            issues[1].to_string(),
-            "Too big: expected number to be <=256"
+            parse(
+                json!({"path": "/a", "max_file_bytes": MAX_INSPECT_ELF_NOTE_FILE_BYTES + 1, "max_entries": 0})
+            ),
+            Err(vec![
+                range(
+                    "max_file_bytes",
+                    None,
+                    Some(MAX_INSPECT_ELF_NOTE_FILE_BYTES)
+                ),
+                range("max_entries", Some(1), None),
+            ])
         );
+        assert_eq!(
+            parse(json!({"path": "/a", "max_file_bytes": -5, "max_entries": 1.5})),
+            Err(vec![
+                range("max_file_bytes", Some(64), None),
+                InputIssue::new(["max_entries"], InputIssueReason::InvalidType)
+                    .with_expected("int"),
+            ])
+        );
+        let accepted = parse(json!({
+            "path": "/a",
+            "max_file_bytes": MAX_INSPECT_ELF_NOTE_FILE_BYTES,
+            "max_entries": 256.0,
+        }))
+        .unwrap();
+        assert_eq!(accepted.max_entries, MAX_INSPECT_ELF_NOTE_ENTRIES);
+    }
 
-        input.max_file_bytes = MAX_INSPECT_ELF_NOTE_FILE_BYTES + 1;
-        input.max_entries = 0;
+    #[test]
+    fn input_parsing_admits_only_nonempty_nul_free_path_text() {
         assert_eq!(
-            input
-                .validate()
-                .iter()
-                .map(|issue| issue.bound)
-                .collect::<Vec<_>>(),
-            [
-                InputRangeBound::Maximum(MAX_INSPECT_ELF_NOTE_FILE_BYTES),
-                InputRangeBound::Minimum(1),
-            ]
+            parse(json!({})),
+            Err(vec![
+                InputIssue::new(["path"], InputIssueReason::MissingArgument)
+                    .with_expected("string")
+            ])
         );
-        input.max_file_bytes = MAX_INSPECT_ELF_NOTE_FILE_BYTES;
-        input.max_entries = MAX_INSPECT_ELF_NOTE_ENTRIES;
-        assert!(input.validate().is_empty());
+        assert_eq!(
+            parse(json!({"path": 7, "max_entries": "8"})),
+            Err(vec![
+                InputIssue::new(["path"], InputIssueReason::InvalidType).with_expected("string"),
+                InputIssue::new(["max_entries"], InputIssueReason::InvalidType)
+                    .with_expected("number"),
+            ])
+        );
+        assert_eq!(
+            parse(json!({"path": ""})),
+            Err(vec![range("path", Some(1), None)])
+        );
+        assert_eq!(
+            parse(json!({"path": "/a\0b"})),
+            Err(vec![
+                InputIssue::new(["path"], InputIssueReason::InvalidFormat)
+                    .with_expected("regex")
+                    .with_message("Local filesystem paths cannot contain NUL")
+            ])
+        );
+        assert_eq!(
+            parse(json!(["/a"])),
+            Err(vec![
+                InputIssue::new(Vec::<String>::new(), InputIssueReason::InvalidType)
+                    .with_expected("object")
+            ])
+        );
+        assert_eq!(
+            InspectElfNotesInput::parse(None),
+            Err(vec![
+                InputIssue::new(Vec::<String>::new(), InputIssueReason::MissingArgument)
+                    .with_expected("object")
+            ])
+        );
     }
 
     #[test]

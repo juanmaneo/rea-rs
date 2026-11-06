@@ -16,6 +16,9 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# Shared ELF note fixture builders (`rea-native/tests/elf_notes/fixture.rs`).
+flate2.workspace = true
+ruzstd.workspace = true
 
 [lints]
 workspace = true

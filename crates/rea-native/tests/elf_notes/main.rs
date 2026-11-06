@@ -51,7 +51,8 @@ fn input_with(max_file_bytes: Option<u64>, max_entries: Option<u64>) -> InspectE
     if let Some(max_entries) = max_entries {
         input.max_entries = max_entries;
     }
-    assert_eq!(input.validate(), Vec::new());
+    let raw = serde_json::to_value(&input).unwrap();
+    assert_eq!(InspectElfNotesInput::parse(Some(&raw)), Ok(input.clone()));
     input
 }
 

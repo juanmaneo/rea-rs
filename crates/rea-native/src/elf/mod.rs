@@ -7,9 +7,11 @@ mod budget;
 mod descriptors;
 mod header;
 mod notes;
+mod provider;
 mod section_names;
 
 pub use notes::parse_elf_notes;
+pub use provider::ElfNotesProvider;
 
 /// Whether a format failure is malformed input or an unsupported feature.
 ///
