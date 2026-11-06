@@ -136,7 +136,7 @@ Decided: the image comes from a Containerfile in the repo, built unchanged by Do
 Still open:
 
 3. **Mounts.** Target read-only, plus a separate writable output mount?
-4. **Capabilities.** Which capabilities to grant inside the user namespace (for example `SYS_PTRACE` for debuggers and Frida), and whether a custom seccomp profile is needed.
+4. ~~**Capabilities.**~~ Decided: least privilege. `--cap-drop=ALL` and `no-new-privileges` by default; each operation adds back only the capabilities it proves it needs, for that run only. Engine default seccomp profile; never `--privileged` or `seccomp=unconfined`; a custom profile only if narrower. FreeBSD jails: every `allow.*` off unless needed. To verify when the runner is built: a debugger or Frida that launches the target as its own child may need no `SYS_PTRACE` at all (same UID, subject to Yama `ptrace_scope`); attaching to an unrelated process does.
 5. ~~**Platform limits.**~~ Decided: Linux and FreeBSD only. Windows and macOS targets are not supported for execution, injection, or mutation; the runner refuses them (fail closed). No VM or host fallback.
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
 7. ~~**FreeBSD.**~~ Decided: containers follow the host OS. Linux host: Linux image built by Docker, Podman, or Buildah. FreeBSD host: FreeBSD image built and run by Podman/Buildah as jails (Docker does not run on FreeBSD). The repo keeps one Containerfile per host OS.
