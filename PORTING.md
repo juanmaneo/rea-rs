@@ -85,7 +85,7 @@ Bring-your-own tools, driven through `rea-process`. Code that must run inside th
 | Android                 | `inspect-android-package`, `search-android-classes`, `decode-android-resources` | `src/android`, `apktool`, `jeb` | Java (JADX)        |
 | adb                     | the `*-adb-*` command family                                | `src/adb` 5.7k / 4.4k  | -                            |
 | Captures                | `inspect-pcap-*`, `capture-process`                         | `src/pcap`, `captures` | -                            |
-| Frida                   | `list-frida-*`, `instrument-with-frida`                     | `src/frida` 1.9k       | none in `bridge/`; upstream uses Node `frida-bindings`, so the Rust binding needs a scope decision |
+| Frida                   | `list-frida-*`, `instrument-with-frida`                     | `src/frida` 1.9k       | none in `bridge/`; upstream uses the Node `frida` package. Decided: Rust port with a minimal FFI crate, run in a container (see Scope decisions). No Rust `frida` crate is in the offline cache. |
 | Desktop / native UI     | `inspect-desktop-application`, `observe-native-ui`          | `src/desktop`, `windows` | Swift (`bridge/native`, `bridge/process`), Python (`bridge/agentenv`) |
 
 Foreign-host code under `upstream:bridge/` stays in its host's language. Inventory: `ghidra` (11 files, Java), `android/ReaJadxBridge.java`, `nativeaot` (4 Java files, NativeAOT scripts), `hopper_bridge.py`, `cutter`, `mitmproxy`, `native/rea_lldb_tracer.py`, `pwndbg` and `pwntools` (Python), and the Swift helpers in `native` and `process`. `pwntools` and `pwndbg` run offline ELF/core adapters through Python; check whether their logic can move to Rust before porting them.
@@ -94,8 +94,8 @@ Foreign-host code under `upstream:bridge/` stays in its host's language. Invento
 
 | Area                                              | Upstream (src / test)                    | Notes                                                                       |
 | ------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| Browser/CDP, web capture, scenarios               | `src/browser` 34.4k / 29.1k, `inspector`, `electron` | CDP client in Rust; Playwright has no Rust equivalent - needs a scope decision. |
-| JavaScript reconstruction                         | `src/javascript`, `domain/javascript` 58k, `application/javascript` 16.6k | Source maps and AST projection. Scope decision needed: upstream pins Node-based codecs. |
+| Browser/CDP, web capture, scenarios               | `src/browser` 34.4k / 29.1k, `inspector`, `electron` | CDP client in Rust. Playwright (`playwright-core`, 13 files / 8.7k lines, a runtime dependency) is still open; see Scope decisions. |
+| JavaScript reconstruction                         | `src/javascript`, `domain/javascript` 58k, `application/javascript` 16.6k | Source maps and AST projection. Decided: the source-map codec (upstream runs `@jridgewell/trace-mapping` in a Node child) is ported to Rust. |
 | Setup, doctor, installers                         | `src/application/Setup*`, `src/cli`      | Must show planned changes and require approval; never install unrelated software. |
 | Sessions, investigations, Evidence bundles        | `application/investigation`, `application/environment` 9.4k | Retained Evidence, Unknown ownership, snapshot caches. |
 | Analysis view, reconstruction ledgers, graphs     | `domain/analysisView` 41.6k, `project-*-application-graph` | Largest single domain area; port last.                                |
@@ -105,7 +105,35 @@ Foreign-host code under `upstream:bridge/` stays in its host's language. Invento
 1. **Foundations.** `rea-process`, `rea-config`, CLI output envelope, MCP stdio server, the typed `analysis_profile` and `relationship_coverage`, and the deferred error tags. Every later wave depends on these.
 2. **In-process readers.** Cheapest per capability and fully testable without third-party tools; each carries one CLI command and one MCP tool.
 3. **External-tool providers.** One at a time, each behind the process module with the lifecycle regressions from `upstream:docs/testing.md`. Real-provider verification is separate from simulated coverage and must be reported separately.
-4. **Browser, JavaScript, setup, sessions.** Needs the scope decisions marked above before substantial implementation (AGENTS.md: fail-closed integration).
+4. **Browser, JavaScript, setup, sessions.** Needs the open questions below answered before substantial implementation (AGENTS.md: fail-closed integration).
+
+## Scope decisions
+
+Recorded in [LEARNING.md](LEARNING.md). Summary of what each one changes here:
+
+| Item                          | Decision                                                | Consequence                                                                                   |
+| ----------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Node.js                       | Gone entirely, including optional bindings.             | Every Node-backed upstream component is reimplemented in Rust.                                |
+| JavaScript source-map codec   | Port to Rust.                                           | Replaces the owned Node codec child. Port `SourceMapFormat`, `TraceSourceMap`, and their tests with the existing limits. No Rust source-map crate is in the offline cache, so the decoder is written in-repo or a crate is justified when added. |
+| Frida                         | Port to Rust; FFI only if very limited.                 | One small FFI crate owns every `unsafe` block; other crates stay `unsafe_code = deny`.        |
+| Target execution / injection / mutation | Run in containers (podman).                   | A container runner owns the target's lifecycle (likely beside `rea-process`). Podman is bring-your-own. |
+| Tests                         | `cargo test`.                                           | vitest, fast-check, and Stryker are not ported.                                               |
+| Playwright                    | **Open.**                                               | See below.                                                                                    |
+
+### Open: Playwright replacement
+
+Upstream's browser scenario and Electron capture drive pages through `playwright-core` (`PlaywrightScenario*`, `PlaywrightElectron*`, `ElectronCaptureCleanup`). It is not a test dependency. The code only references Chromium and Electron (inferred from identifier counts). Playwright for Chromium is a CDP driver, and upstream already has a CDP provider (`CdpBrowserProvider`, `ws`). Proposed: replace it with a Rust CDP client over WebSocket for Chromium and Electron, and drop Firefox/WebKit unless the maintainer wants them. Needs confirmation.
+
+### Open: container policy
+
+Before any target-execution capability (`debug-with-*`, Frida, `capture-process`, browser and Electron launch) is ported, decide:
+
+1. **Image.** Caller-supplied, or a Containerfile kept in the repo?
+2. **Network.** Default none, with an explicit opt-in?
+3. **Mounts.** Target read-only, plus a separate writable output mount?
+4. **Privileges.** Rootless only; which capabilities (for example `SYS_PTRACE` for debuggers and Frida) and whether a custom seccomp profile is needed.
+5. **Platform limits.** Windows and macOS targets cannot run in a Linux container. Fail closed, or a different route?
+6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
 
 ## Checklist for porting one capability
 
