@@ -17,6 +17,8 @@ What the agent has learned from the maintainer's instructions. Add to this as ne
 
 ## Scope decisions
 
+- **Linux and FreeBSD are the primary platforms**, for both development and use. Running on macOS or Windows hosts is a non-goal: do not port host-specific code for them, add `cfg` branches for them, or test on them. Prefer portable POSIX/`cfg(unix)` code. When behaviour differs between Linux and FreeBSD (errno values, `/proc` versus `sysctl`/`procstat`, package databases), handle both and gate with `target_os`. Type-check FreeBSD with `--target x86_64-unknown-freebsd`. Static analysis of their binary formats (PE, Mach-O, code signatures, Apple crash reports, Swift metadata) is still in scope: it only reads bytes.
+
 These resolve the "needs a scope decision" items from [PORTING.md](PORTING.md). Open questions are listed there too.
 
 - **No Node.js anywhere.** Not as a runtime, a helper process, or an optional native binding. Whatever upstream runs through Node is ported to Rust.
@@ -26,6 +28,7 @@ These resolve the "needs a scope decision" items from [PORTING.md](PORTING.md). 
   - **Image:** built from a Containerfile kept in the repo. It must build unchanged with Docker, Podman, and Buildah, so use only the OCI/Dockerfile syntax all three accept (no BuildKit-only extensions such as `RUN --mount`, heredocs, or `# syntax=` directives).
   - **Network:** off by default. Access only by explicit caller opt-in.
   - **Privileges:** root inside the container is allowed when needed, but never root on the host. Container root must map to an unprivileged host user (a user namespace). In practice that means rootless Podman or Docker in rootless or `userns-remap` mode. A default rootful Docker daemon gives container root real host root, so REA must refuse it (fail closed) rather than run there.
+  - **Container engine on FreeBSD:** Docker does not run on FreeBSD; Podman there runs FreeBSD jails, and Linux-image support goes through the Linux ABI layer. How the runner behaves on FreeBSD is still open.
   - **Windows and macOS targets:** not supported for execution, injection, or mutation. REA refuses them with a clear error (fail closed). There is no VM or host fallback.
   - Still open: mounts and container ownership (see [PORTING.md](PORTING.md)). Execution capabilities wait for these.
 - **Tests are ported to `cargo test`.** Upstream's vitest, fast-check, and Stryker setup is not carried over.

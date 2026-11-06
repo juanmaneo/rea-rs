@@ -24,10 +24,12 @@ MCP is pending everywhere: no tool is exposed over MCP until the server adapter 
 | Analysis error contract and projection       | `rea-domain::error`                                   | partial     | From source and ported tests. Deferred tags: Hopper\*, Browser, ProcessCapture, UnknownRegistry, ProviderSelection, BinaryTarget. |
 | Local path and typed input admission         | `rea-domain::input`                                   | partial     | Zod issue projection ported for the shapes `inspect_elf_notes` needs (path, bounded integer, strict members).        |
 | Stable bounded artifact read                 | `rea-filesystem::stable_read`                         | ported      | From source and ported tests. Unix only; descriptor-close failure projection is not reproduced (see below).        |
-| Caller path resolution                       | `rea-filesystem::caller_path`                         | partial     | POSIX branch only.                                                                                                 |
+| Caller path resolution                       | `rea-filesystem::caller_path`                         | ported      | POSIX only; the Windows branch is out of scope (Linux and FreeBSD only).                                                                                               |
 | `inspect_elf_notes` / `rea inspect-elf-notes` | `rea-native::elf`, `rea-application`, `rea-cli`       | ported      | Parser, provider, service, and CLI tests ported from upstream's unit and acceptance tests. Upstream was not run.   |
 
 ## Intentional divergences
+
+- **Platforms.** Linux and FreeBSD only. The workspace type-checks for `x86_64-unknown-freebsd`; tests have only run on Linux. Known gap: when a path becomes a symlink between the `lstat` check and the `O_NOFOLLOW` open, FreeBSD reports `EMLINK` where Linux reports `ELOOP`, and `ErrnoCode` does not map `EMLINK` yet (source-derived, not reproduced).
 
 - **Default CLI output** is JSON. Upstream defaults to `toon`; that and `yaml`, `md`, `csv`, `tsv`, `jsonl`, `--filter-output`, `--columns`, `--token-limit`, `--full-output`, and `--timings` belong to the CLI envelope (wave 1) and are rejected or absent until then.
 - **Descriptor cleanup.** Upstream models read-only descriptor close failure as a retained cleanup obligation (`ArtifactResourceScope`). `rea-filesystem` closes on `Drop`; a read-only descriptor holds no buffered writes, so a close failure has no caller-visible consequence. Revisit when a writing resource (extraction, output trees) is ported.
@@ -86,7 +88,7 @@ Bring-your-own tools, driven through `rea-process`. Code that must run inside th
 | adb                     | the `*-adb-*` command family                                | `src/adb` 5.7k / 4.4k  | -                            |
 | Captures                | `inspect-pcap-*`, `capture-process`                         | `src/pcap`, `captures` | -                            |
 | Frida                   | `list-frida-*`, `instrument-with-frida`                     | `src/frida` 1.9k       | none in `bridge/`; upstream uses the Node `frida` package. Decided: Rust port with a minimal FFI crate, run in a container (see Scope decisions). No Rust `frida` crate is in the offline cache. |
-| Desktop / native UI     | `inspect-desktop-application`, `observe-native-ui`          | `src/desktop`, `windows` | Swift (`bridge/native`, `bridge/process`), Python (`bridge/agentenv`) |
+| Desktop                 | `inspect-desktop-application`, `capture-desktop-application` | `src/desktop` (Linux: X11, apt, dconf) | Python (`bridge/agentenv`). macOS native UI (Swift) and `src/windows` are dropped (Linux and FreeBSD only). |
 
 Foreign-host code under `upstream:bridge/` stays in its host's language. Inventory: `ghidra` (11 files, Java), `android/ReaJadxBridge.java`, `nativeaot` (4 Java files, NativeAOT scripts), `hopper_bridge.py`, `cutter`, `mitmproxy`, `native/rea_lldb_tracer.py`, `pwndbg` and `pwntools` (Python), and the Swift helpers in `native` and `process`. `pwntools` and `pwndbg` run offline ELF/core adapters through Python; check whether their logic can move to Rust before porting them.
 
@@ -113,6 +115,7 @@ Recorded in [LEARNING.md](LEARNING.md). Summary of what each one changes here:
 
 | Item                          | Decision                                                | Consequence                                                                                   |
 | ----------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Host platform                 | Linux and FreeBSD. macOS and Windows hosts are a non-goal. | Not ported: the Windows native addon (`upstream:native/windows`), `src/windows`, the Windows branches of Ghidra/IDA/process/filesystem code, the macOS native-UI provider (`src/native/NativeMacOSProvider.ts`, Swift `bridge/native/*.swift`), and the Swift process-token reader (`bridge/process`). `observe-native-ui`, `trace-native-ui-action`, and `capture-native-ui-scenario` are macOS-only upstream, so they are dropped unless a Linux/FreeBSD backend is requested. Kept: desktop inspection (`src/desktop`: X11, apt, dpkg, dconf; Linux-specific upstream, a FreeBSD `pkg` backend is open), Hopper (upstream supports Linux; FreeBSD unverified), the LLDB tracer (Python), and static PE/Mach-O/Apple format readers. |
 | Node.js                       | Gone entirely, including optional bindings.             | Every Node-backed upstream component is reimplemented in Rust.                                |
 | JavaScript source-map codec   | Port to Rust.                                           | Replaces the owned Node codec child. Port `SourceMapFormat`, `TraceSourceMap`, and their tests with the existing limits. No Rust source-map crate is in the offline cache, so the decoder is written in-repo or a crate is justified when added. |
 | Frida                         | Port to Rust; FFI only if very limited.                 | One small FFI crate owns every `unsafe` block; other crates stay `unsafe_code = deny`.        |
@@ -134,8 +137,9 @@ Still open:
 
 3. **Mounts.** Target read-only, plus a separate writable output mount?
 4. **Capabilities.** Which capabilities to grant inside the user namespace (for example `SYS_PTRACE` for debuggers and Frida), and whether a custom seccomp profile is needed.
-5. ~~**Platform limits.**~~ Decided: Windows and macOS targets are not supported for execution, injection, or mutation. The runner refuses them (fail closed); no VM or host fallback.
+5. ~~**Platform limits.**~~ Decided: Linux and FreeBSD only. Windows and macOS targets are not supported for execution, injection, or mutation; the runner refuses them (fail closed). No VM or host fallback.
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
+7. **FreeBSD.** Docker does not run on FreeBSD; Podman there runs jails, and Linux images need the Linux ABI layer. Decide whether the runner supports FreeBSD hosts with Linux images, FreeBSD images, or fails closed there.
 
 ## Checklist for porting one capability
 
