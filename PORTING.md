@@ -116,7 +116,7 @@ Recorded in [LEARNING.md](LEARNING.md). Summary of what each one changes here:
 | Node.js                       | Gone entirely, including optional bindings.             | Every Node-backed upstream component is reimplemented in Rust.                                |
 | JavaScript source-map codec   | Port to Rust.                                           | Replaces the owned Node codec child. Port `SourceMapFormat`, `TraceSourceMap`, and their tests with the existing limits. No Rust source-map crate is in the offline cache, so the decoder is written in-repo or a crate is justified when added. |
 | Frida                         | Port to Rust; FFI only if very limited.                 | One small FFI crate owns every `unsafe` block; other crates stay `unsafe_code = deny`.        |
-| Target execution / injection / mutation | Run in containers (podman).                   | A container runner owns the target's lifecycle (likely beside `rea-process`). Podman is bring-your-own. |
+| Target execution / injection / mutation | Run in containers built from a repo Containerfile; network off by default. | A container runner owns the target's lifecycle (likely beside `rea-process`). The Containerfile must build unchanged with Docker, Podman, and Buildah. The engine is bring-your-own. |
 | Tests                         | `cargo test`.                                           | vitest, fast-check, and Stryker are not ported.                                               |
 | Playwright                    | **Open.**                                               | See below.                                                                                    |
 
@@ -128,8 +128,10 @@ Upstream's browser scenario and Electron capture drive pages through `playwright
 
 Before any target-execution capability (`debug-with-*`, Frida, `capture-process`, browser and Electron launch) is ported, decide:
 
-1. **Image.** Caller-supplied, or a Containerfile kept in the repo?
-2. **Network.** Default none, with an explicit opt-in?
+Decided: the image comes from a Containerfile in the repo, built unchanged by Docker, Podman, and Buildah (portable syntax only, no BuildKit extensions). Network is off by default and enabled only by explicit caller opt-in.
+
+Still open:
+
 3. **Mounts.** Target read-only, plus a separate writable output mount?
 4. **Privileges.** Rootless only; which capabilities (for example `SYS_PTRACE` for debuggers and Frida) and whether a custom seccomp profile is needed.
 5. **Platform limits.** Windows and macOS targets cannot run in a Linux container. Fail closed, or a different route?
