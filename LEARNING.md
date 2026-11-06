@@ -25,7 +25,8 @@ These resolve the "needs a scope decision" items from [PORTING.md](PORTING.md). 
 - **Target execution, injection, and mutation run in containers (podman), not on the host.** Podman is bring-your-own, like Ghidra and IDA: REA never installs or upgrades it. Container policy:
   - **Image:** built from a Containerfile kept in the repo. It must build unchanged with Docker, Podman, and Buildah, so use only the OCI/Dockerfile syntax all three accept (no BuildKit-only extensions such as `RUN --mount`, heredocs, or `# syntax=` directives).
   - **Network:** off by default. Access only by explicit caller opt-in.
-  - Still open: mounts, privileges, Windows/macOS targets, and container ownership (see [PORTING.md](PORTING.md)). Execution capabilities wait for these.
+  - **Privileges:** root inside the container is allowed when needed, but never root on the host. Container root must map to an unprivileged host user (a user namespace). In practice that means rootless Podman or Docker in rootless or `userns-remap` mode. A default rootful Docker daemon gives container root real host root, so REA must refuse it (fail closed) rather than run there.
+  - Still open: mounts, Windows/macOS targets, and container ownership (see [PORTING.md](PORTING.md)). Execution capabilities wait for these.
 - **Tests are ported to `cargo test`.** Upstream's vitest, fast-check, and Stryker setup is not carried over.
 - **Playwright: still open.** The maintainer asked to drop it and port its tests. Upstream uses `playwright-core` as a runtime dependency, not a test tool: 13 non-test files (about 8.7k lines) under `upstream:src/browser` drive `capture-browser-scenario`, `capture-electron-scenario`, and related commands. Only Chromium and Electron appear in that code (inferred from identifier counts, not read in full). Waiting on the maintainer to confirm how to replace it.
 

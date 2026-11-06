@@ -128,12 +128,12 @@ Upstream's browser scenario and Electron capture drive pages through `playwright
 
 Before any target-execution capability (`debug-with-*`, Frida, `capture-process`, browser and Electron launch) is ported, decide:
 
-Decided: the image comes from a Containerfile in the repo, built unchanged by Docker, Podman, and Buildah (portable syntax only, no BuildKit extensions). Network is off by default and enabled only by explicit caller opt-in.
+Decided: the image comes from a Containerfile in the repo, built unchanged by Docker, Podman, and Buildah (portable syntax only, no BuildKit extensions). Network is off by default and enabled only by explicit caller opt-in. Root is allowed inside the container but never on the host: container root must map to an unprivileged host user (rootless Podman, or Docker rootless / `userns-remap`). The runner checks the engine before starting a target and refuses a rootful engine. The exact detection method per engine (for example `podman info` reporting rootless, `docker info` security options) must be verified against real engines when the runner is built.
 
 Still open:
 
 3. **Mounts.** Target read-only, plus a separate writable output mount?
-4. **Privileges.** Rootless only; which capabilities (for example `SYS_PTRACE` for debuggers and Frida) and whether a custom seccomp profile is needed.
+4. **Capabilities.** Which capabilities to grant inside the user namespace (for example `SYS_PTRACE` for debuggers and Frida), and whether a custom seccomp profile is needed.
 5. **Platform limits.** Windows and macOS targets cannot run in a Linux container. Fail closed, or a different route?
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
 
