@@ -7,6 +7,7 @@
 //!
 //! Upstream reference: `upstream:src/domain/`.
 
+pub mod cancellation;
 pub mod digest;
 pub mod error;
 pub mod evidence;
