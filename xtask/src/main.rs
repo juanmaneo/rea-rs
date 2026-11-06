@@ -157,13 +157,32 @@ impl Step {
     }
 }
 
+/// A cargo command over the whole workspace unless the forwarded arguments
+/// select packages; cargo lets `--workspace` override `-p`.
+fn scoped(command: &str, flags: &[&str], extra: Vec<OsString>) -> Step {
+    let mut base = vec![command];
+    if !selects_packages(&extra) {
+        base.push("--workspace");
+    }
+    base.extend_from_slice(flags);
+    Step::new(&base, extra)
+}
+
+fn selects_packages(cargo_args: &[OsString]) -> bool {
+    cargo_args
+        .iter()
+        .take_while(|arg| *arg != "--")
+        .filter_map(|arg| arg.to_str())
+        .any(|arg| arg.starts_with("-p") || arg == "--package" || arg.starts_with("--package="))
+}
+
 fn steps(task: Task, extra: Vec<OsString>) -> Vec<Step> {
     match task {
-        Task::Check => vec![Step::new(&["check", "--workspace", "--all-targets"], extra)],
+        Task::Check => vec![scoped("check", &["--all-targets"], extra)],
         Task::Fmt => vec![Step::new(&["fmt", "--all"], extra)],
         Task::Clippy => vec![clippy(extra)],
-        Task::Test => vec![Step::new(&["test", "--workspace"], extra)],
-        Task::Coverage => vec![Step::new(&["llvm-cov", "--workspace"], extra)],
+        Task::Test => vec![scoped("test", &[], extra)],
+        Task::Coverage => vec![scoped("llvm-cov", &[], extra)],
         Task::Doc => vec![doc(extra)],
         Task::Ci => vec![
             Step::new(&["fmt", "--all", "--check"], []),
@@ -180,10 +199,7 @@ fn clippy(extra: Vec<OsString>) -> Step {
         Some(index) => (&extra[..index], &extra[index + 1..]),
         None => (&extra[..], &[][..]),
     };
-    let mut step = Step::new(
-        &["clippy", "--workspace", "--all-targets"],
-        cargo_args.to_vec(),
-    );
+    let mut step = scoped("clippy", &["--all-targets"], cargo_args.to_vec());
     step.args
         .extend(["--", "-D", "warnings"].map(OsString::from));
     step.args.extend(lint_args.iter().cloned());
@@ -191,7 +207,7 @@ fn clippy(extra: Vec<OsString>) -> Step {
 }
 
 fn doc(extra: Vec<OsString>) -> Step {
-    let mut step = Step::new(&["doc", "--workspace", "--no-deps"], extra);
+    let mut step = scoped("doc", &["--no-deps"], extra);
     step.deny_rustdoc_warnings = true;
     step
 }
@@ -321,7 +337,6 @@ mod tests {
             clippy(os(&["-p", "xtask", "--", "-W", "clippy::pedantic"])).args,
             os(&[
                 "clippy",
-                "--workspace",
                 "--all-targets",
                 "-p",
                 "xtask",
@@ -342,6 +357,25 @@ mod tests {
                 "-D",
                 "warnings"
             ])
+        );
+    }
+
+    #[test]
+    fn package_selection_replaces_the_workspace_scope() {
+        let display = |extra: &[&str]| steps(Task::Test, os(extra))[0].display();
+        assert_eq!(display(&["-p", "rea-domain"]), "cargo test -p rea-domain");
+        assert_eq!(display(&["-prea-domain"]), "cargo test -prea-domain");
+        assert_eq!(
+            display(&["--package=rea-domain"]),
+            "cargo test --package=rea-domain"
+        );
+        assert_eq!(
+            display(&["digest", "--", "-p"]),
+            "cargo test --workspace digest -- -p"
+        );
+        assert_eq!(
+            steps(Task::Check, os(&["-p", "xtask"]))[0].display(),
+            "cargo check --all-targets -p xtask"
         );
     }
 
