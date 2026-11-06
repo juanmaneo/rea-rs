@@ -20,6 +20,12 @@ impl CancellationSignal {
         Self::default()
     }
 
+    /// A signal driven by an externally owned flag, such as one an OS signal
+    /// handler sets. The owner must only ever set the flag, never clear it.
+    pub fn from_flag(flag: Arc<AtomicBool>) -> Self {
+        Self { cancelled: flag }
+    }
+
     /// Request cancellation for every clone of this signal.
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
