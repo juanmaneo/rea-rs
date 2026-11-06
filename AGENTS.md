@@ -69,13 +69,17 @@ Reserve performance measurements for changes that target performance or have a c
 
 Pin the toolchain in `rust-toolchain.toml` and the MSRV in the workspace `Cargo.toml`. Commit `Cargo.lock`. Add dependencies at the workspace level, prefer well-maintained crates, and justify each new one.
 
-- `cargo build --workspace`: build all crates.
-- `cargo test --workspace`: run tests (`-p CRATE` or a test name filter for focused runs).
-- `cargo fmt --all --check`: formatting.
-- `cargo clippy --workspace --all-targets -- -D warnings`: lints.
-- `cargo doc --workspace --no-deps`: validate documentation.
+Development tasks use the `cargo xtask` pattern (`xtask/`, std-only, aliased in `.cargo/config.toml`). Add new repository automation as xtask tasks, not shell scripts or npm scripts. Extra arguments are forwarded to the underlying cargo command.
 
-Run the checks relevant to the change. Run the full set before declaring broad changes done.
+- `cargo xtask check`: type-check every workspace target.
+- `cargo xtask fmt`: format (`--check` to verify only).
+- `cargo xtask clippy`: lints with `-D warnings`.
+- `cargo xtask test`: run tests (`-p CRATE` or a test name filter for focused runs).
+- `cargo xtask coverage`: tests under `cargo-llvm-cov` (bring-your-own; `--html` or `--lcov --output-path PATH` for reports).
+- `cargo xtask doc`: build documentation with `-D warnings`.
+- `cargo xtask ci`: the full gate: fmt check, clippy, test, doc.
+
+Run the checks relevant to the change. Run `cargo xtask ci` before declaring broad changes done.
 
 When changing installers or setup recovery, follow upstream's installer guidance (`upstream:docs/testing.md`, "Checking installers and publisher downloads").
 

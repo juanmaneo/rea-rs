@@ -8,6 +8,11 @@ What the agent has learned from the maintainer's instructions. Add to this as ne
 - Goal: use **Rust as much as possible**.
 - `AGENTS.md` is adapted from upstream's `AGENTS.md` for the Rust port. Keep the upstream principles and replace the TypeScript/Node.js tooling with Rust/Cargo.
 
+## Porting approach
+
+- Port REA to Rust **incrementally**.
+- Step one: repository automation via the **cargo xtask pattern** (check, fmt, clippy, test, coverage).
+
 ## Repository layout
 
 | Branch     | Tracks                | Purpose                                                        |
