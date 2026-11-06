@@ -135,7 +135,7 @@ Decided: the image comes from a Containerfile in the repo, built unchanged by Do
 
 Still open:
 
-3. **Mounts.** Target read-only, plus a separate writable output mount?
+3. ~~**Mounts.**~~ Decided: the target is mounted read-only; output goes to one separate writable mount owned by the run; nothing else from the host is mounted. FreeBSD: read-only `nullfs`.
 4. ~~**Capabilities.**~~ Decided: least privilege. `--cap-drop=ALL` and `no-new-privileges` by default; each operation adds back only the capabilities it proves it needs, for that run only. Engine default seccomp profile; never `--privileged` or `seccomp=unconfined`; a custom profile only if narrower. FreeBSD jails: every `allow.*` off unless needed. To verify when the runner is built: a debugger or Frida that launches the target as its own child may need no `SYS_PTRACE` at all (same UID, subject to Yama `ptrace_scope`); attaching to an unrelated process does.
 5. ~~**Platform limits.**~~ Decided: Linux and FreeBSD only. Windows and macOS targets are not supported for execution, injection, or mutation; the runner refuses them (fail closed). No VM or host fallback.
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
