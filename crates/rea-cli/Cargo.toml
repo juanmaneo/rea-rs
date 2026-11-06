@@ -1,0 +1,25 @@
+[package]
+name = "rea-cli"
+description = "The `rea` one-shot command-line adapter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "rea"
+path = "src/main.rs"
+
+[dependencies]
+rea-domain.workspace = true
+rea-application.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

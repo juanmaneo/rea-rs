@@ -1,0 +1,25 @@
+[package]
+name = "rea-native"
+description = "In-process native binary format readers (provider adapters)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rea-domain.workspace = true
+rea-filesystem.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+flate2.workspace = true
+ruzstd.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

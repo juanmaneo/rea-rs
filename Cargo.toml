@@ -1,8 +1,48 @@
 [workspace]
 resolver = "3"
-members = ["xtask"]
+members = ["crates/*", "xtask"]
 
 [workspace.package]
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.99"
+license = "MIT"
+repository = "https://github.com/juanmaneo/rea-rs"
 publish = false
+
+[workspace.dependencies]
+# Internal crates. Dependencies flow inward:
+# domain <- filesystem <- native (providers) <- application <- cli.
+rea-domain = { path = "crates/rea-domain" }
+rea-filesystem = { path = "crates/rea-filesystem" }
+rea-native = { path = "crates/rea-native" }
+rea-application = { path = "crates/rea-application" }
+
+# Typed JSON contracts. `preserve_order` keeps object members in the order
+# producers build them, matching upstream's JavaScript object output.
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order", "float_roundtrip"] }
+# Evidence and artifact digests.
+sha2 = "0.11.1"
+# Shortest round-trip float digits for JavaScript-compatible number text.
+ryu = "1.0.23"
+# Typed error enums.
+thiserror = "2.0.21"
+# Command-line parsing for the `rea` binary.
+clap = { version = "4.6.7", features = ["derive"] }
+# Compressed ELF section-name tables (zlib and Zstandard) without C toolchains.
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+ruzstd = "0.9.0"
+# `O_NOFOLLOW` for stable artifact reads on Unix.
+libc = "0.2.191"
+# Test-only temporary directories.
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"

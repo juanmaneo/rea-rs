@@ -1,0 +1,206 @@
+[
+  {
+    "value": null,
+    "digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+  },
+  {
+    "value": true,
+    "digest": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+  },
+  {
+    "value": false,
+    "digest": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+  },
+  {
+    "value": 0,
+    "digest": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  {
+    "value": 0,
+    "digest": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  {
+    "value": 1,
+    "digest": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+  },
+  {
+    "value": -1,
+    "digest": "1bad6b8cf97131fceab8543e81f7757195fbb1d36b376ee994ad1cf17699c464"
+  },
+  {
+    "value": 42,
+    "digest": "73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049"
+  },
+  {
+    "value": 9007199254740991,
+    "digest": "f40b423c2dd95ff2b2f027e22208f438cf7242862e5e746860e697308c9add26"
+  },
+  {
+    "value": 1e+21,
+    "digest": "241c4643fa70b1dcde1205b71be4e3bebb17e9f880c8e1a33d0ead6c27271d3c"
+  },
+  {
+    "value": 100000000000000000000,
+    "digest": "c344e9487bfbd5c4e03c9fb90d62a5dde5e00b54d55c46e9f4a803aea162b80c"
+  },
+  {
+    "value": 1e+30,
+    "digest": "7412d94bdf30adfa71080e057185e1a8de86e2e99a8350b011df8ac41ed5a6e3"
+  },
+  {
+    "value": 1.5e-7,
+    "digest": "bbe54b73760f9025086de0202c3caa81352dc0260869890c9dca3cda39ba767f"
+  },
+  {
+    "value": 1e-7,
+    "digest": "5b33e02f2c5103a05d32f6ba9cb058294452bfbf393967f68bb30c1bdcbbab22"
+  },
+  {
+    "value": 0.000001,
+    "digest": "159fb29a827ad04b260aa6c8ab6d8637f8f2b38af5c4f3cb49d6a21205e040f8"
+  },
+  {
+    "value": 0.1,
+    "digest": "14be4b45f18e0d8c67b4f719b5144eee88497e413709d11d85b096d8e2346310"
+  },
+  {
+    "value": 0.30000000000000004,
+    "digest": "06bad31060c1212ae832de4c031f7b31e3b48aed57858294478cb19450cf34ca"
+  },
+  {
+    "value": 123.456,
+    "digest": "52dad41684065ccf8dd86bc21e739e57c750e4e1305f759956b7373308023eae"
+  },
+  {
+    "value": -2.5,
+    "digest": "20fb508cd069b7fbaf72c798394a7995c9a3ded09ccf19a294fdb9415fd03317"
+  },
+  {
+    "value": 5e-324,
+    "digest": "c46e7ca1be4c8734f373a56530787288fa2058d73d07855e9247e949f811a42a"
+  },
+  {
+    "value": 1.7976931348623157e+308,
+    "digest": "c2784e1abd6317452708f3fbf9641c16b959561bc621a1d408c23a20aa2cb585"
+  },
+  {
+    "value": "",
+    "digest": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"
+  },
+  {
+    "value": "plain",
+    "digest": "945603a8f587786b463c3f94fce115c0fae88fac2728cc96ddf5981cf7f61741"
+  },
+  {
+    "value": "quote\"back\\slash",
+    "digest": "24d068a2208ac11770a521612a25a1761f627848a50b4a2d29a71c8b6a56413e"
+  },
+  {
+    "value": "\b\f\n\r\t\u0000\u001f",
+    "digest": "9f45a9799c133ab8aa0136fc633c962b8a2307f74d98556b6494cb4b334e7bad"
+  },
+  {
+    "value": "  ",
+    "digest": "e3a0e2262ac7790f4df36b522a8fbdd4ee3370d568eb15dc25c5f1775f14ed6c"
+  },
+  {
+    "value": "€😀é",
+    "digest": "64f14130ff2c1e6bbba4c41c6cfa8970cf743f3d292e68083b47e1249acfd912"
+  },
+  {
+    "value": "/slash",
+    "digest": "962af5c94ca4d5f2dd73b35fb99112b08ceb45434e935c675a8692f19812239d"
+  },
+  {
+    "value": [],
+    "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+    "value": {},
+    "digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "value": [
+      1,
+      [
+        2,
+        [
+          3,
+          []
+        ]
+      ]
+    ],
+    "digest": "2ae49150ac570d8d71784d5c84619d21a59e217faf3c632b0ef7a5477b61eb4d"
+  },
+  {
+    "value": {
+      "b": 1,
+      "a": 2,
+      "A": 3,
+      "": 4,
+      "aa": 5,
+      "a\u0000": 6
+    },
+    "digest": "0dd4618a6c04afaa716b5bfdb75ee8e98a85ffd3cd8505a97af131383d3539e8"
+  },
+  {
+    "value": {
+      "": "BMP",
+      "𐀀": "supplementary",
+      "￿": "max-bmp",
+      "é": "latin",
+      "z": "ascii"
+    },
+    "digest": "7014c660295e99bc5406fafa510ea7ee3f29d5ded7df5863e51ab353a6df68dc"
+  },
+  {
+    "value": {
+      "nested": {
+        "z": [
+          {
+            "y": 1.25,
+            "x": null
+          }
+        ],
+        "a": {
+          "9": 2,
+          "10": 1,
+          "-1": 3
+        }
+      }
+    },
+    "digest": "bc9ab2a92542825fe428b3321497c25def6c944acd9e5762182c915332decfe4"
+  },
+  {
+    "value": {
+      "evidence_like": {
+        "subject": {
+          "digest": {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "format": "elf",
+          "architecture": "x86_64"
+        },
+        "provider": {
+          "id": "rea-elf-notes",
+          "name": "REA ELF notes",
+          "version": null
+        },
+        "limitations": [],
+        "locations": [
+          {
+            "kind": "file-offset-range",
+            "start": 64,
+            "end": 100
+          }
+        ],
+        "parameters": {
+          "path": "/tmp/program",
+          "max_file_bytes": 67108864,
+          "max_entries": 32
+        }
+      }
+    },
+    "digest": "2029a2de3e541ee7e65c0d512fbe8e0cf637965028d668c8b81157bfcf5e5d6e"
+  }
+]
