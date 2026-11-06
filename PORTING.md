@@ -140,7 +140,7 @@ Still open:
 5. ~~**Platform limits.**~~ Decided: Linux and FreeBSD only. Windows and macOS targets are not supported for execution, injection, or mutation; the runner refuses them (fail closed). No VM or host fallback.
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
 7. ~~**FreeBSD.**~~ Decided: containers follow the host OS. Linux host: Linux image built by Docker, Podman, or Buildah. FreeBSD host: FreeBSD image built and run by Podman/Buildah as jails (Docker does not run on FreeBSD). The repo keeps one Containerfile per host OS.
-8. **Cross-OS targets.** With containers following the host, a Linux ELF target on a FreeBSD host (or a FreeBSD target on Linux) has no matching container. Fail closed, or allow FreeBSD's Linux ABI layer?
+8. ~~**Cross-OS targets.**~~ Decided: if ever needed, use [unibin](https://github.com/juanmaneo/unibin) or Cosmopolitan libc. These package REA's own binaries (container helpers) as one artifact for Linux and FreeBSD hosts. They cannot run a third-party target built for another OS, so such a target fails closed. Deferred until a capability needs it.
 
 ## Checklist for porting one capability
 
