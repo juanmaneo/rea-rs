@@ -134,7 +134,7 @@ Still open:
 
 3. **Mounts.** Target read-only, plus a separate writable output mount?
 4. **Capabilities.** Which capabilities to grant inside the user namespace (for example `SYS_PTRACE` for debuggers and Frida), and whether a custom seccomp profile is needed.
-5. **Platform limits.** Windows and macOS targets cannot run in a Linux container. Fail closed, or a different route?
+5. ~~**Platform limits.**~~ Decided: Windows and macOS targets are not supported for execution, injection, or mutation. The runner refuses them (fail closed); no VM or host fallback.
 6. **Ownership.** How container identity and cleanup retry fit the `rea-process` model (a container name alone does not prove ownership after exit or reuse).
 
 ## Checklist for porting one capability
