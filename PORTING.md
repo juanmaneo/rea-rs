@@ -96,7 +96,7 @@ Foreign-host code under `upstream:bridge/` stays in its host's language. Invento
 
 | Area                                              | Upstream (src / test)                    | Notes                                                                       |
 | ------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| Browser/CDP, web capture, scenarios               | `src/browser` 34.4k / 29.1k, `inspector`, `electron` | CDP client in Rust. Playwright (`playwright-core`, 13 files / 8.7k lines, a runtime dependency) is still open; see Scope decisions. |
+| Browser/CDP, web capture, scenarios               | `src/browser` 34.4k / 29.1k, `inspector`, `electron` | Playwright is dropped. Blitz is a candidate for HTML/CSS rendering; commands that observe live JavaScript are open (see Scope decisions). |
 | JavaScript reconstruction                         | `src/javascript`, `domain/javascript` 58k, `application/javascript` 16.6k | Source maps and AST projection. Decided: the source-map codec (upstream runs `@jridgewell/trace-mapping` in a Node child) is ported to Rust. |
 | Setup, doctor, installers                         | `src/application/Setup*`, `src/cli`      | Must show planned changes and require approval; never install unrelated software. |
 | Sessions, investigations, Evidence bundles        | `application/investigation`, `application/environment` 9.4k | Retained Evidence, Unknown ownership, snapshot caches. |
@@ -121,11 +121,11 @@ Recorded in [LEARNING.md](LEARNING.md). Summary of what each one changes here:
 | Frida                         | Port to Rust; FFI only if very limited.                 | One small FFI crate owns every `unsafe` block; other crates stay `unsafe_code = deny`.        |
 | Target execution / injection / mutation | Run in containers built from a repo Containerfile; network off by default. | A container runner owns the target's lifecycle (likely beside `rea-process`). The Containerfile must build unchanged with Docker, Podman, and Buildah. The engine is bring-your-own. |
 | Tests                         | `cargo test`.                                           | vitest, fast-check, and Stryker are not ported.                                               |
-| Playwright                    | **Open.**                                               | See below.                                                                                    |
+| Playwright                    | Dropped.                                                | `PlaywrightScenario*`, `PlaywrightElectron*`, and `ElectronCaptureCleanup` are not ported. Blitz (no JavaScript) is the candidate for HTML/CSS rendering. |
 
-### Open: Playwright replacement
+### Open: web commands that need a JavaScript engine
 
-Upstream's browser scenario and Electron capture drive pages through `playwright-core` (`PlaywrightScenario*`, `PlaywrightElectron*`, `ElectronCaptureCleanup`). It is not a test dependency. The code only references Chromium and Electron (inferred from identifier counts). Playwright for Chromium is a CDP driver, and upstream already has a CDP provider (`CdpBrowserProvider`, `ws`). Proposed: replace it with a Rust CDP client over WebSocket for Chromium and Electron, and drop Firefox/WebKit unless the maintainer wants them. Needs confirmation.
+Blitz can render HTML/CSS, but it has no JavaScript engine. Several upstream commands exist to observe JavaScript running in a real browser: `observe-web-execution`, `observe-web-session`, `inspect-web-event-listeners`, `trace-web-source-location`, `trace-web-module-imports`, `inspect-web-network-capture`, `capture-browser-scenario`, and the Electron scenario commands. Upstream drives those through CDP against a caller-supplied Chromium (`CdpBrowserProvider`, `ws`), not only through Playwright. Options: (a) a Rust CDP client against a bring-your-own Chromium running in the container, (b) drop these commands, (c) another engine. Needs a decision before wave 4. Commands that only read already-captured data (`analyze-web-bundle`, `compare-web-captures`, `compare-web-screenshots`) do not need a browser.
 
 ### Open: container policy
 

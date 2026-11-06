@@ -32,7 +32,8 @@ These resolve the "needs a scope decision" items from [PORTING.md](PORTING.md). 
   - **Windows and macOS targets:** not supported for execution, injection, or mutation. REA refuses them with a clear error (fail closed). There is no VM or host fallback.
   - Still open: mounts and container ownership (see [PORTING.md](PORTING.md)). Execution capabilities wait for these.
 - **Tests are ported to `cargo test`.** Upstream's vitest, fast-check, and Stryker setup is not carried over.
-- **Playwright: still open.** The maintainer asked to drop it and port its tests. Upstream uses `playwright-core` as a runtime dependency, not a test tool: 13 non-test files (about 8.7k lines) under `upstream:src/browser` drive `capture-browser-scenario`, `capture-electron-scenario`, and related commands. Only Chromium and Electron appear in that code (inferred from identifier counts, not read in full). Waiting on the maintainer to confirm how to replace it.
+- **Playwright: dropped.** It has no place in the Rust port; do not port it, wrap it, or look for a Rust clone of it. Upstream uses `playwright-core` at runtime (13 files, about 8.7k lines under `upstream:src/browser`) for `capture-browser-scenario`, `capture-electron-scenario`, and related commands.
+- **Blitz** ([DioxusLabs/blitz](https://github.com/DioxusLabs/blitz)) is the suggested Rust engine for rendering HTML/CSS (SSR). Per its README it is beta, renders HTML and CSS through Stylo, Taffy, and Parley, and deliberately has **no JavaScript engine** (no websockets, localStorage, and so on). It fits rendering static or server-rendered HTML; it cannot observe script execution.
 
 ## Repository layout
 
