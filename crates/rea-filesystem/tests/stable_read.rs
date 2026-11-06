@@ -10,7 +10,7 @@ use std::process::Command;
 use rea_domain::cancellation::CancellationSignal;
 use rea_domain::digest::Sha256Digest;
 use rea_domain::error::{ArtifactLimitBoundary, ArtifactOperationReason};
-use rea_filesystem::{ErrnoCode, StableReadError, read_stable_artifact};
+use rea_filesystem::{ErrnoCode, StableReadError, is_no_follow_symlink, read_stable_artifact};
 
 fn read(
     path: &Path,
@@ -34,6 +34,31 @@ fn reads_exact_bytes_and_digest_without_modifying_the_file() {
     let after = fs::metadata(&path).unwrap();
     assert_eq!(before.modified().unwrap(), after.modified().unwrap());
     assert_eq!(fs::read(&path).unwrap(), contents);
+}
+
+#[test]
+fn recognises_the_host_errno_for_a_no_follow_open_of_a_symlink() {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("target");
+    fs::write(&target, b"x").unwrap();
+    let link = dir.path().join("link");
+    symlink(&target, &link).unwrap();
+
+    let error = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&link)
+        .unwrap_err();
+
+    assert!(
+        is_no_follow_symlink(&error),
+        "unrecognised errno: {error:?}"
+    );
+    assert!(!is_no_follow_symlink(&std::io::Error::from_raw_os_error(
+        libc::ENOENT
+    )));
 }
 
 #[test]

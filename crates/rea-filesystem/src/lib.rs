@@ -12,5 +12,5 @@ pub mod errno;
 pub mod stable_read;
 
 pub use caller_path::{RelativeWorkingDirectory, absolute_caller_path};
-pub use errno::ErrnoCode;
+pub use errno::{ErrnoCode, is_no_follow_symlink};
 pub use stable_read::{ChangeStage, StableArtifact, StableReadError, read_stable_artifact};

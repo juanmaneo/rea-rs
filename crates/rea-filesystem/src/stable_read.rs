@@ -12,7 +12,7 @@ use rea_domain::digest::Sha256Digest;
 use rea_domain::error::{ArtifactLimitBoundary, ArtifactOperationReason};
 use sha2::{Digest, Sha256};
 
-use crate::errno::ErrnoCode;
+use crate::errno::{ErrnoCode, is_no_follow_symlink};
 
 /// Bytes read past the admitted length are hashed through scratch space of
 /// this size so growth is detected without allocating beyond the budget.
@@ -176,7 +176,15 @@ pub fn read_stable_artifact(
             maximum_bytes,
         });
     }
-    let file = after_validation(path, ChangeStage::BeforeOpen, open_no_follow(path))?;
+    // A symlink swapped in after validation is a change, whichever errno the
+    // host uses to refuse it.
+    let file = open_no_follow(path).map_err(|source| {
+        if is_no_follow_symlink(&source) {
+            changed(path, ChangeStage::BeforeOpen, Some(source))
+        } else {
+            validation_failure(path, ChangeStage::BeforeOpen, source)
+        }
+    })?;
     let initial = file.metadata().map_err(io)?;
     if !initial.file_type().is_file() || !platform::same_identity(&initial, &before) {
         return Err(changed(path, ChangeStage::BeforeOpen, None));
@@ -263,13 +271,17 @@ fn after_validation<T>(
     stage: ChangeStage,
     result: io::Result<T>,
 ) -> Result<T, StableReadError> {
-    result.map_err(|source| match ErrnoCode::of(&source) {
+    result.map_err(|source| validation_failure(path, stage, source))
+}
+
+fn validation_failure(path: &Path, stage: ChangeStage, source: io::Error) -> StableReadError {
+    match ErrnoCode::of(&source) {
         Some(code) if code.is_unresolved_path() => changed(path, stage, Some(source)),
         _ => StableReadError::Io {
             path: path.to_path_buf(),
             source,
         },
-    })
+    }
 }
 
 /// Suggest a retry only when the rejected link currently resolves to a regular file.

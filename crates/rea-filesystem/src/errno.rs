@@ -7,6 +7,30 @@
 
 use std::io;
 
+/// Whether an `open` with `O_NOFOLLOW` failed because the final path
+/// component is a symlink.
+///
+/// Linux reports `ELOOP`; FreeBSD reports `EMLINK`. `EMLINK` keeps its usual
+/// "too many links" meaning everywhere else, so this applies only to the
+/// result of an `O_NOFOLLOW` open and is not folded into [`ErrnoCode`].
+/// Upstream checks `ELOOP` only.
+#[cfg(unix)]
+pub fn is_no_follow_symlink(error: &io::Error) -> bool {
+    match error.raw_os_error() {
+        Some(libc::ELOOP) => true,
+        #[cfg(target_os = "freebsd")]
+        Some(libc::EMLINK) => true,
+        _ => false,
+    }
+}
+
+/// Whether an `open` with `O_NOFOLLOW` failed because the final path
+/// component is a symlink.
+#[cfg(not(unix))]
+pub fn is_no_follow_symlink(_error: &io::Error) -> bool {
+    false
+}
+
 /// A host error code REA classifies; other codes stay opaque I/O failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrnoCode {

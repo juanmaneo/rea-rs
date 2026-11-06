@@ -29,7 +29,7 @@ MCP is pending everywhere: no tool is exposed over MCP until the server adapter 
 
 ## Intentional divergences
 
-- **Platforms.** Linux and FreeBSD only. The workspace type-checks for `x86_64-unknown-freebsd`; tests have only run on Linux. Known gap: when a path becomes a symlink between the `lstat` check and the `O_NOFOLLOW` open, FreeBSD reports `EMLINK` where Linux reports `ELOOP`, and `ErrnoCode` does not map `EMLINK` yet (source-derived, not reproduced).
+- **Platforms.** Linux and FreeBSD only. The workspace type-checks for `x86_64-unknown-freebsd`; tests have only run on Linux. An `O_NOFOLLOW` open of a symlink fails with `ELOOP` on Linux and `EMLINK` on FreeBSD; `rea_filesystem::is_no_follow_symlink` recognises both, so a symlink swapped in after validation reports `Changed` on both hosts. Upstream checks `ELOOP` only, so on FreeBSD it would misreport that race as an opaque I/O error (source-derived, not run). The `EMLINK` branch is type-checked for FreeBSD but has not run on a FreeBSD host.
 
 - **Default CLI output** is JSON. Upstream defaults to `toon`; that and `yaml`, `md`, `csv`, `tsv`, `jsonl`, `--filter-output`, `--columns`, `--token-limit`, `--full-output`, and `--timings` belong to the CLI envelope (wave 1) and are rejected or absent until then.
 - **Descriptor cleanup.** Upstream models read-only descriptor close failure as a retained cleanup obligation (`ArtifactResourceScope`). `rea-filesystem` closes on `Drop`; a read-only descriptor holds no buffered writes, so a close failure has no caller-visible consequence. Revisit when a writing resource (extraction, output trees) is ported.
