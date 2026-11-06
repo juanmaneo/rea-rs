@@ -1,0 +1,45 @@
+graph TD
+    %% Crate ownership and dependency direction as built, not a module inventory.
+    %% Arrows point from a crate to what it depends on; dependencies flow inward.
+    %% Reference composition: upstream:docs/architecture.mermaid.
+    subgraph "Entry Points (binaries)"
+        CLI["rea-cli<br/>`rea` one-shot adapter<br/>argument grammar, output envelope,<br/>caller-path binding, SIGINT/SIGTERM"]
+        MCP["MCP server adapter (pending)<br/>stdio transport, tool registration"]
+    end
+
+    subgraph "Application"
+        APP["rea-application<br/>shared CLI/MCP workflows<br/>input admission, provider ports,<br/>Evidence completion"]
+    end
+
+    subgraph "Provider adapters"
+        NATIVE["rea-native<br/>in-process format readers<br/>ELF notes (ported)"]
+        EXTERNAL["external-tool providers (pending)<br/>Ghidra, IDA, Hopper, adb, ...<br/>run through the shared process module"]
+        PROCESS["process supervision (pending)<br/>child identity, cancellation, cleanup"]
+    end
+
+    subgraph "Host boundary"
+        FS["rea-filesystem<br/>bounded identity-checked reads,<br/>caller path resolution, errno classes"]
+    end
+
+    subgraph "Domain"
+        DOMAIN["rea-domain<br/>Evidence, canonical digests,<br/>analysis error contract, typed inputs,<br/>result declarations, provider identities,<br/>cancellation signal"]
+    end
+
+    subgraph "Foreign hosts (stay in the host's language)"
+        BRIDGES["Ghidra/JADX Java, Hopper/Cutter/LLDB Python,<br/>macOS Swift helpers (pending)"]
+    end
+
+    CLI --> APP
+    CLI -. "composes providers" .-> NATIVE
+    CLI --> FS
+    MCP --> APP
+    APP --> NATIVE
+    APP --> EXTERNAL
+    EXTERNAL --> PROCESS
+    EXTERNAL -. "spawned inside the host" .-> BRIDGES
+    NATIVE --> FS
+    PROCESS --> FS
+    FS --> DOMAIN
+    APP --> DOMAIN
+    NATIVE --> DOMAIN
+    CLI --> DOMAIN

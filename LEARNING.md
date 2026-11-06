@@ -12,6 +12,8 @@ What the agent has learned from the maintainer's instructions. Add to this as ne
 
 - Port REA to Rust **incrementally**.
 - Step one: repository automation via the **cargo xtask pattern** (check, fmt, clippy, test, coverage).
+- Scope: **all of the code on upstream `main`**, mirrored locally in the `upstream` branch. The goal is the whole product, so [PORTING.md](PORTING.md) inventories every upstream area, its target crate, and its status. It is a multi-session effort and each capability lands as its own commit with its own tests.
+- Order: foundations first (xtask, then shared contracts and the host boundary), then one capability at a time end to end (domain, provider, application, CLI).
 
 ## Repository layout
 
