@@ -57,14 +57,15 @@ limitations. Failure results are projected error JSON with exit code 1.
 
 ## How it works
 
-You — or your agent, over MCP — point `rea-rs` at a local target. It inspects
-the target with the capability you selected, and returns findings with their
-evidence: what was observed, what was derived, what remains unknown. CLI
-commands and MCP tools use the same workflows.
+You point `rea-rs` at a local target. It inspects the target with the
+capability you selected, and returns findings with their evidence: what was
+observed, what was derived, what remains unknown. CLI commands and MCP tools
+share the same workflows; until the MCP adapter lands, the CLI is the only
+entry point.
 
 Static readers parse bytes that were already read; they never run the target.
-Capabilities that must execute, inject into, or mutate a target run it inside a
-container, never on the host.
+Capabilities that must execute, inject into, or mutate a target are not ported
+yet; when they are, they will run it inside a container, never on the host.
 
 ## Design
 
@@ -84,10 +85,10 @@ container, never on the host.
 - **Fail closed.** Capabilities with unresolved scope, authority, or
   side-effect questions are not integrated. Targets that cannot run in a
   matching container are refused, not guessed at.
-- **Containment.** Target execution runs in a container built from a
+- **Containment.** Target execution will run in a container built from a
   Containerfile kept in this repository: network off by default, least
   privilege, the target mounted read-only, root allowed inside the container
-  but never on the host.
+  but never on the host. No execution capability is ported yet.
 
 ## Development
 
@@ -125,4 +126,5 @@ are welcome; a human reviews and owns the final diff.
 
 ## License
 
-Upstream REA is MIT. This port has not declared its license yet.
+MIT, like upstream REA. See [LICENSE](LICENSE), which keeps the upstream
+copyright notice alongside this port's.
