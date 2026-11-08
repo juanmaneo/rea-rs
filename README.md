@@ -1,3 +1,6 @@
+[![CI](https://github.com/juanmaneo/rea-rs/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/juanmaneo/rea-rs/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 # rea-rs: Reverse Engineer Anything, in Rust
 
 ### A Rust port of [REA](https://github.com/morluto/rea): one local tool for reverse engineering across binaries, applications, and runtime behavior, shared by your terminal and your agent.
