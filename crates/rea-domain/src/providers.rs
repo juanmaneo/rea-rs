@@ -33,3 +33,10 @@ pub const ELF_NOTES_PROVIDER: ProviderIdentity = ProviderIdentity {
     name: "REA ELF note parser",
     version: "1",
 };
+
+/// Portable, execution-free Linux kernel-module metadata decoding.
+pub const KERNEL_MODULE_PROVIDER: ProviderIdentity = ProviderIdentity {
+    id: "rea-kernel-module",
+    name: "REA kernel module parser",
+    version: "1",
+};

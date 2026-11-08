@@ -7,7 +7,9 @@
 //! Upstream reference: `upstream:src/cli/` and `upstream:src/cliOutput.ts`.
 
 mod arguments;
+mod evidence_command;
 mod inspect_elf_notes;
+mod inspect_kernel_module;
 mod interrupt;
 mod output;
 
@@ -21,5 +23,6 @@ fn main() -> ExitCode {
     let format = cli.output.format();
     match cli.command {
         Command::InspectElfNotes(arguments) => inspect_elf_notes::run(&arguments, format),
+        Command::InspectKernelModule(arguments) => inspect_kernel_module::run(&arguments, format),
     }
 }

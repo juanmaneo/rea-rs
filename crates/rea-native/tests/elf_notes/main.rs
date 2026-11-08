@@ -15,11 +15,13 @@ use fixture::{
     gnu_build_id_note, gnu_property_note, hex, latin1, put16, put32, put64,
 };
 use rea_domain::digest::Sha256Digest;
+use rea_domain::native::elf::{
+    ElfByteOrder, ElfFileRange, ElfFormat, ElfObjectTypeName, HexBytes, InspectedArtifact,
+};
 use rea_domain::native::elf_notes::{
-    CoreAuxvEntry, CoreFile, CoreFileMapping, CorePrpsinfo, CoreSiginfo, ElfByteOrder, ElfCoreNote,
-    ElfFileRange, ElfNoteEntry, ElfNoteTableKind, ElfNoteTypeName, ElfNotes, ElfNotesArtifact,
-    ElfNotesCoverage, ElfNotesCoverageStatus, ElfNotesFormat, ElfObjectTypeName, GnuAbiTag,
-    HexBytes, HexWord, InspectElfNotesInput,
+    CoreAuxvEntry, CoreFile, CoreFileMapping, CorePrpsinfo, CoreSiginfo, ElfCoreNote, ElfNoteEntry,
+    ElfNoteTableKind, ElfNoteTypeName, ElfNotes, ElfNotesCoverage, ElfNotesCoverageStatus,
+    GnuAbiTag, HexWord, InspectElfNotesInput,
 };
 use rea_native::elf::{
     BinaryFormatFailureKind, ElfNotesFailure, ElfNotesLimitBoundary, parse_elf_notes,
@@ -57,7 +59,7 @@ fn input_with(max_file_bytes: Option<u64>, max_entries: Option<u64>) -> InspectE
 }
 
 fn try_parse_with(bytes: &[u8], input: &InspectElfNotesInput) -> Result<ElfNotes, ElfNotesFailure> {
-    let artifact = ElfNotesArtifact {
+    let artifact = InspectedArtifact {
         path: input.path.clone(),
         sha256: Sha256Digest::of(bytes),
         bytes: u32::try_from(bytes.len()).unwrap(),
@@ -228,9 +230,9 @@ fn reads_gnu_build_id_and_abi_tag_notes_from_elf32_and_elf64() {
             ..ImageOptions::default()
         }));
         let format = if bits.wide() {
-            ElfNotesFormat::Elf64
+            ElfFormat::Elf64
         } else {
-            ElfNotesFormat::Elf32
+            ElfFormat::Elf32
         };
         assert_eq!(report.format, format);
         assert_eq!(report.byte_order, ElfByteOrder::Little);
@@ -1447,7 +1449,7 @@ fn decodes_core_dump_notes_end_to_end() {
     });
     let report = parse(&bytes);
     assert_eq!(report.artifact.sha256, Sha256Digest::of(&bytes));
-    assert_eq!(report.format, ElfNotesFormat::Elf64);
+    assert_eq!(report.format, ElfFormat::Elf64);
     assert_eq!(report.byte_order, ElfByteOrder::Little);
     assert_eq!(report.machine, 62);
     assert_eq!(

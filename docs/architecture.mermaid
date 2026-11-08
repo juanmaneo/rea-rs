@@ -12,7 +12,7 @@ graph TD
     end
 
     subgraph "Provider adapters"
-        NATIVE["rea-native<br/>in-process format readers<br/>ELF notes (ported)"]
+        NATIVE["rea-native<br/>in-process format readers<br/>ELF notes, kernel modules (ported)"]
         EXTERNAL["external-tool providers (pending)<br/>Ghidra, IDA, Hopper, adb, ...<br/>run through the shared process module"]
         PROCESS["process supervision (pending)<br/>child identity, cancellation, cleanup"]
     end

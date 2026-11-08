@@ -111,7 +111,14 @@ const EM_CUDA: u16 = 190;
 const ELFOSABI_CUDA: u8 = 0x33;
 
 /// Decode common ELF framing and admit the version and declared header size.
-pub(crate) fn read_elf_fixed_header(bytes: &[u8]) -> Result<ElfFixedHeader, String> {
+///
+/// `bytes` may be a bounded prefix of a `total_bytes` file; both must hold a
+/// complete fixed header, and the declared header size is admitted against
+/// the whole file.
+pub(crate) fn read_elf_fixed_header(
+    bytes: &[u8],
+    total_bytes: usize,
+) -> Result<ElfFixedHeader, String> {
     if bytes.len() >= 4 && !bytes.starts_with(b"\x7fELF") {
         return Err("not an ELF image".to_owned());
     }
@@ -137,10 +144,13 @@ pub(crate) fn read_elf_fixed_header(bytes: &[u8]) -> Result<ElfFixedHeader, Stri
         format!(
             "truncated ELF header: an ELF{} header needs {minimum} bytes; the file has {}",
             class.bits(),
-            bytes.len()
+            total_bytes
         )
     };
-    if bytes.len() < usize::from(minimum) {
+    if total_bytes < bytes.len()
+        || total_bytes < usize::from(minimum)
+        || bytes.len() < usize::from(minimum)
+    {
         return Err(truncated());
     }
     let read16 = |at| endian.u16(bytes, at).ok_or_else(truncated);
@@ -152,7 +162,7 @@ pub(crate) fn read_elf_fixed_header(bytes: &[u8]) -> Result<ElfFixedHeader, Stri
     if version != 1 && !(machine == EM_CUDA && os_abi == ELFOSABI_CUDA) {
         return Err("unsupported ELF header version".to_owned());
     }
-    if header_size < minimum || usize::from(header_size) > bytes.len() {
+    if header_size < minimum || usize::from(header_size) > total_bytes {
         return Err("invalid ELF header size".to_owned());
     }
     Ok(ElfFixedHeader {
@@ -218,7 +228,9 @@ pub(crate) fn validate_elf_section_table_presence(
 pub(crate) struct ElfProgramHeader {
     pub(crate) program_type: u32,
     pub(crate) offset: u64,
+    pub(crate) virtual_address: u64,
     pub(crate) file_size: u64,
+    pub(crate) memory_size: u64,
     pub(crate) alignment: u64,
 }
 
@@ -235,7 +247,9 @@ pub(crate) fn read_elf_program_header(
         Some(ElfProgramHeader {
             program_type: endian.u32(bytes, 0)?,
             offset: endian.word(class, bytes, if wide { 8 } else { 4 })?,
+            virtual_address: endian.word(class, bytes, if wide { 16 } else { 8 })?,
             file_size: endian.word(class, bytes, if wide { 32 } else { 16 })?,
+            memory_size: endian.word(class, bytes, if wide { 40 } else { 20 })?,
             alignment: endian.word(class, bytes, if wide { 48 } else { 28 })?,
         })
     };
@@ -250,6 +264,8 @@ pub(crate) struct ElfSectionHeader {
     pub(crate) flags: u64,
     pub(crate) offset: u64,
     pub(crate) size: u64,
+    pub(crate) link: u32,
+    pub(crate) info: u32,
     pub(crate) alignment: u64,
 }
 
@@ -269,6 +285,8 @@ pub(crate) fn read_elf_section_header(
             flags: endian.word(class, bytes, 8)?,
             offset: endian.word(class, bytes, if wide { 24 } else { 16 })?,
             size: endian.word(class, bytes, if wide { 32 } else { 20 })?,
+            link: endian.u32(bytes, if wide { 40 } else { 24 })?,
+            info: endian.u32(bytes, if wide { 44 } else { 28 })?,
             alignment: endian.word(class, bytes, if wide { 48 } else { 32 })?,
         })
     };

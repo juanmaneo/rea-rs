@@ -6,18 +6,18 @@ use std::path::Path;
 
 use rea_domain::cancellation::CancellationSignal;
 use rea_domain::error::{
-    AccessDeniedCode, AnalysisError, ArtifactOperationError, FixedAllowance, FixedAllowanceKind,
-    InputError, InputIssue, InputIssueReason, ResourceConstraintError, ResourceConstraintRecovery,
-    ResourceKind,
+    AnalysisError, FixedAllowance, FixedAllowanceKind, ResourceConstraintError,
+    ResourceConstraintRecovery, ResourceKind,
 };
+use rea_domain::native::elf::InspectedArtifact;
 use rea_domain::native::elf_notes::{
-    ElfNotes, ElfNotesArtifact, InspectElfNotesInput, MAX_INSPECT_ELF_NOTE_ENTRIES,
-    MAX_INSPECT_ELF_NOTE_FILE_BYTES,
+    ElfNotes, InspectElfNotesInput, MAX_INSPECT_ELF_NOTE_ENTRIES, MAX_INSPECT_ELF_NOTE_FILE_BYTES,
 };
 use rea_domain::providers::{ELF_NOTES_PROVIDER, ProviderIdentity};
-use rea_filesystem::{ErrnoCode, StableReadError, read_stable_artifact};
+use rea_filesystem::read_stable_artifact;
 use serde_json::{Map, Value};
 
+use super::artifact_read::{ReadSubject, invalid_format, read_failure};
 use super::{BinaryFormatFailureKind, ElfNotesFailure, ElfNotesLimitBoundary, parse_elf_notes};
 
 const OPERATION: &str = "inspect_elf_notes";
@@ -40,8 +40,17 @@ impl ElfNotesProvider {
         input: &InspectElfNotesInput,
         signal: &CancellationSignal,
     ) -> Result<ElfNotes, AnalysisError> {
+        let subject = ReadSubject {
+            operation: OPERATION,
+            noun: "Selected ELF image",
+            path: &input.path,
+        };
         let snapshot = read_stable_artifact(Path::new(&input.path), input.max_file_bytes, signal)
-            .map_err(|failure| read_failure(failure, input))?;
+            .map_err(|failure| {
+            read_failure(failure, &subject, |message| {
+                limit_failure(ElfNotesLimitBoundary::FileSize, message, input)
+            })
+        })?;
         let Ok(bytes) = u32::try_from(snapshot.bytes.len()) else {
             // The stable read admits at most `max_file_bytes`, which input
             // validation bounds well below `u32::MAX`.
@@ -54,7 +63,7 @@ impl ElfNotesProvider {
                 input,
             ));
         };
-        let artifact = ElfNotesArtifact {
+        let artifact = InspectedArtifact {
             path: input.path.clone(),
             sha256: snapshot.sha256,
             bytes,
@@ -99,74 +108,8 @@ fn parse_failure(failure: ElfNotesFailure, input: &InspectElfNotesInput) -> Anal
         ElfNotesFailure::Format {
             kind: BinaryFormatFailureKind::Malformed,
             message,
-        } => invalid_format(message, None),
+        } => invalid_format(OPERATION, message, None),
         ElfNotesFailure::Limit { boundary, message } => limit_failure(boundary, message, input),
-    }
-}
-
-fn read_failure(failure: StableReadError, input: &InspectElfNotesInput) -> AnalysisError {
-    let message = failure.to_string();
-    match failure {
-        StableReadError::Changed { .. } => {
-            AnalysisError::artifact_changed(OPERATION, input.path.clone(), message)
-        }
-        StableReadError::Cancelled => AnalysisError::cancelled(OPERATION),
-        StableReadError::ExceedsLimit { .. } | StableReadError::GrewBeyondLimit { .. } => {
-            limit_failure(ElfNotesLimitBoundary::FileSize, message, input)
-        }
-        StableReadError::NotRegularFile { resolved_path, .. } => {
-            // A non-UTF-8 target cannot be named in caller-facing text, so
-            // only the retry hint is omitted.
-            let resolved = resolved_path
-                .as_deref()
-                .and_then(Path::to_str)
-                .map(str::to_owned);
-            invalid_format(message, resolved)
-        }
-        StableReadError::Io { ref source, .. } => match ErrnoCode::of(source) {
-            Some(ErrnoCode::Eacces) => AnalysisError::access_denied(
-                OPERATION,
-                input.path.clone(),
-                AccessDeniedCode::Eacces,
-            ),
-            Some(ErrnoCode::Eperm) => {
-                AnalysisError::access_denied(OPERATION, input.path.clone(), AccessDeniedCode::Eperm)
-            }
-            Some(code) if code.is_selected_regular_file() => AnalysisError::input(
-                OPERATION,
-                [
-                    InputIssue::new(["path"], InputIssueReason::InvalidValue).with_message(
-                        format!(
-                            "Selected ELF image could not be read ({}): {}.",
-                            code.as_str(),
-                            input.path
-                        ),
-                    ),
-                ],
-            ),
-            _ => ArtifactOperationError::new(OPERATION, failure.reason(), Some(message)).into(),
-        },
-    }
-}
-
-/// A malformed selection; a rejected symlink offers its verified target.
-///
-/// Upstream reference: `stableArtifactInputRecovery` in
-/// `upstream:src/artifacts/StableArtifactFailure.ts`.
-fn invalid_format(message: String, resolved_path: Option<String>) -> AnalysisError {
-    let error = InputError::new(OPERATION).with_issues([InputIssue::new(
-        ["path"],
-        InputIssueReason::InvalidFormat,
-    )
-    .with_message(message)]);
-    match resolved_path {
-        Some(resolved) => error
-            .with_remediation_action(format!(
-                "Retry with the resolved regular file path {resolved}. The selected symlink is not admitted; the retry will validate the target again."
-            ))
-            .conforming_to_input_contract()
-            .into(),
-        None => error.into(),
     }
 }
 

@@ -325,6 +325,15 @@ impl StringTableEntry<'_> {
             Self::Truncated { examined_bytes } => *examined_bytes,
         }
     }
+
+    /// Bytes examined, including the terminating NUL when one was found.
+    pub(crate) fn examined_bytes(&self) -> usize {
+        match self {
+            Self::Outside => 0,
+            Self::Terminated(bytes) => bytes.len() + 1,
+            Self::Truncated { examined_bytes } => *examined_bytes,
+        }
+    }
 }
 
 /// Observe one entry without treating a bounded missing NUL as absence.

@@ -13,7 +13,8 @@ use rea_domain::evidence::{
     BinaryArchitecture, Evidence, EvidenceLocation, EvidenceObservation, EvidenceSubjectTarget,
     SubjectFormat,
 };
-use rea_domain::native::elf_notes::{ElfFileRange, ElfNotes, InspectElfNotesInput};
+use rea_domain::native::elf::ElfFileRange;
+use rea_domain::native::elf_notes::{ElfNotes, InspectElfNotesInput};
 use rea_domain::providers::ProviderIdentity;
 use rea_native::elf::ElfNotesProvider;
 use serde_json::Value;

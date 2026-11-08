@@ -22,10 +22,11 @@ MCP is pending everywhere: no tool is exposed over MCP until the server adapter 
 | JSON output (member order, JS number text)   | `rea-domain::json`                                    | ported      | Number text rules from source; covered by the vectors above.                                                       |
 | Evidence envelope and identity               | `rea-domain::evidence`                                | partial     | From source and ported tests. `analysis_profile` and `relationship_coverage` are untyped `Value` pending typed ports. |
 | Analysis error contract and projection       | `rea-domain::error`                                   | partial     | From source and ported tests. Deferred tags: Hopper\*, Browser, ProcessCapture, UnknownRegistry, ProviderSelection, BinaryTarget. |
-| Local path and typed input admission         | `rea-domain::input`                                   | partial     | Zod issue projection ported for the shapes `inspect_elf_notes` needs (path, bounded integer, strict members).        |
+| Local path and typed input admission         | `rea-domain::input`                                   | partial     | Zod issue projection ported for the shapes `inspect_elf_notes` and `inspect_kernel_module` need (path, bounded integer, strict members). |
 | Stable bounded artifact read                 | `rea-filesystem::stable_read`                         | ported      | From source and ported tests. Unix only; descriptor-close failure projection is not reproduced (see below).        |
 | Caller path resolution                       | `rea-filesystem::caller_path`                         | ported      | POSIX only; the Windows branch is out of scope (Linux and FreeBSD only).                                                                                               |
 | `inspect_elf_notes` / `rea inspect-elf-notes` | `rea-native::elf`, `rea-application`, `rea-cli`       | ported      | Parser, provider, service, and CLI tests ported from upstream's unit and acceptance tests. Upstream was not run.   |
+| `inspect_kernel_module` / `rea inspect-kernel-module` | `rea-native::elf`, `rea-application`, `rea-cli` | ported      | Parser, service (fake-provider and filesystem boundary), and CLI tests ported from upstream. Uses a port of upstream's ELF section directory (`readElfImage`). Upstream was not run. |
 
 ## Intentional divergences
 
@@ -58,7 +59,7 @@ These parse bytes already admitted by the stable read. No child process, no fore
 
 | CLI commands                                                                                           | Upstream                                | Target                         |
 | ------------------------------------------------------------------------------------------------------ | --------------------------------------- | ------------------------------ |
-| `inspect-elf-notes` (**ported**), `inspect-kernel-module`, `inspect-devicetree`, `inspect-apple-ips`   | `src/native/elf`, `domain/native`       | `rea-native`                   |
+| `inspect-elf-notes` (**ported**), `inspect-kernel-module` (**ported**), `inspect-devicetree`, `inspect-apple-ips` | `src/native/elf`, `domain/native`       | `rea-native`                   |
 | `inspect-pe-resources`, `-certificates`, `-imports`, `-load-config`, `inspect-native-exports`          | `src/native/pe`, `exports`              | `rea-native`                   |
 | `inspect-binary-hardening`, `inspect-binary-layout`, `inspect-byte-entropy`, `inspect-recorded-crash`  | `src/native/hardening`, `domain/native` | `rea-native`                   |
 | `inspect-macho`, `inspect-signature`, `list-architectures`, `inspect-plist`, `demangle-swift`          | `src/native/apple`, `domain/apple`      | `rea-native`                   |

@@ -6,10 +6,12 @@
 use std::borrow::Cow;
 
 use rea_domain::digest::Sha256Digest;
+use rea_domain::native::elf::{
+    ElfByteOrder, ElfFileRange, ElfFormat, ElfObjectTypeName, HexBytes, InspectedArtifact,
+};
 use rea_domain::native::elf_notes::{
-    ElfByteOrder, ElfFileRange, ElfNoteDescriptor, ElfNoteEntry, ElfNoteTable, ElfNoteTableKind,
-    ElfNoteTypeName, ElfNotes, ElfNotesArtifact, ElfNotesCoverage, ElfNotesCoverageStatus,
-    ElfNotesFormat, ElfObjectTypeName, HexBytes, InspectElfNotesInput,
+    ElfNoteDescriptor, ElfNoteEntry, ElfNoteTable, ElfNoteTableKind, ElfNoteTypeName, ElfNotes,
+    ElfNotesCoverage, ElfNotesCoverageStatus, InspectElfNotesInput,
     MAX_INSPECT_ELF_NOTE_FILE_BYTES,
 };
 
@@ -355,7 +357,7 @@ impl Report {
 /// caller's `max_file_bytes`, so that refusal only guards direct callers.
 pub fn parse_elf_notes(
     bytes: &[u8],
-    artifact: ElfNotesArtifact,
+    artifact: InspectedArtifact,
     input: &InspectElfNotesInput,
 ) -> Result<ElfNotes, ElfNotesFailure> {
     let length = as_u64(bytes.len());
@@ -369,7 +371,7 @@ pub fn parse_elf_notes(
         });
     }
     let header: ElfFixedHeader =
-        read_elf_fixed_header(bytes).map_err(ElfNotesFailure::malformed)?;
+        read_elf_fixed_header(bytes, bytes.len()).map_err(ElfNotesFailure::malformed)?;
     let (class, endian) = (header.class, header.endian);
     let reader = ElfReader { bytes, endian };
     let declared =
@@ -568,9 +570,9 @@ pub fn parse_elf_notes(
     Ok(ElfNotes {
         artifact,
         format: if class.is_wide() {
-            ElfNotesFormat::Elf64
+            ElfFormat::Elf64
         } else {
-            ElfNotesFormat::Elf32
+            ElfFormat::Elf32
         },
         byte_order: if endian.little {
             ElfByteOrder::Little

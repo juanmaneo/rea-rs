@@ -25,6 +25,7 @@ Ported end to end:
 | Capability | Command | What it returns |
 | ---------- | ------- | -------------- |
 | ELF notes | `rea inspect-elf-notes PATH` | `PT_NOTE`/`SHT_NOTE` owners and types, GNU build-id and ABI-tag fields, with Evidence |
+| Linux kernel modules | `rea inspect-kernel-module PATH` | `.modinfo` entries, `__versions` CRCs, `__ksymtab*` sections, init/exit text, and the appended signature trailer; compressed `.ko` containers are recognized, not decoded |
 
 Shared foundations are in place: the analysis error contract, the Evidence
 envelope, canonical JSON digests (RFC 8785, verified against upstream output),

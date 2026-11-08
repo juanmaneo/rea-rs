@@ -7,9 +7,10 @@
 //! Upstream reference: `decodeGnu` and `decodeCore*` in
 //! `upstream:src/native/elf/ElfNoteParser.ts`.
 
+use rea_domain::native::elf::HexBytes;
 use rea_domain::native::elf_notes::{
     CoreAuxvEntry, CoreFile, CoreFileMapping, CorePrpsinfo, CoreSiginfo, ElfCoreNote, ElfGnuNote,
-    GnuAbiTag, HexBytes, HexWord,
+    GnuAbiTag, HexWord,
 };
 
 use super::ElfNotesFailure;

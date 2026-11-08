@@ -22,6 +22,8 @@ pub struct Cli {
 pub enum Command {
     /// Inspect ELF PT_NOTE and SHT_NOTE identities without executing the image
     InspectElfNotes(InspectElfNotesArguments),
+    /// Inspect Linux kernel module metadata without executing the module
+    InspectKernelModule(InspectKernelModuleArguments),
 }
 
 /// Arguments of `inspect-elf-notes`.
@@ -34,6 +36,20 @@ pub struct InspectElfNotesArguments {
     pub max_file_bytes: Option<String>,
     /// Maximum note entries to examine across every table; exceeding the
     /// budget fails without partial success
+    #[arg(long)]
+    pub max_entries: Option<String>,
+}
+
+/// Arguments of `inspect-kernel-module`.
+#[derive(Debug, Args)]
+pub struct InspectKernelModuleArguments {
+    /// Local ELF32/ELF64 kernel module or compressed .ko container
+    pub path: String,
+    /// Maximum stable artifact bytes to read (default 64 MiB)
+    #[arg(long)]
+    pub max_file_bytes: Option<String>,
+    /// Maximum .modinfo and __versions entries plus file-backed __ksymtab*
+    /// sections to examine; exceeding the budget fails without partial success
     #[arg(long)]
     pub max_entries: Option<String>,
 }

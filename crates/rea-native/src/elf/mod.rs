@@ -2,14 +2,22 @@
 //!
 //! [`parse_elf_notes`] decodes `PT_NOTE` and `SHT_NOTE` tables from one
 //! in-memory ELF image into the `inspect_elf_notes` result contract.
+//! [`parse_kernel_module`] decodes Linux kernel-module metadata into the
+//! `inspect_kernel_module` result contract.
 
+mod artifact_read;
 mod budget;
 mod descriptors;
 mod header;
+mod image;
+mod kernel_module;
+mod kernel_module_provider;
 mod notes;
 mod provider;
 mod section_names;
 
+pub use kernel_module::parse_kernel_module;
+pub use kernel_module_provider::KernelModuleProvider;
 pub use notes::parse_elf_notes;
 pub use provider::ElfNotesProvider;
 
@@ -77,6 +85,41 @@ pub enum ElfNotesFailure {
         /// The exhausted bound.
         boundary: ElfNotesLimitBoundary,
         /// Upstream failure text.
+        message: String,
+    },
+}
+
+/// Why kernel-module inspection failed without a partial result.
+///
+/// Messages are byte-identical to upstream text.
+///
+/// Upstream reference: `upstream:src/native/elf/KernelModuleParser.ts` and
+/// the classification in `upstream:src/native/elf/KernelModuleProvider.ts`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum KernelModuleFailure {
+    /// The ELF structure is malformed (invalid input).
+    #[error("{message}")]
+    Malformed {
+        /// Upstream failure text.
+        message: String,
+    },
+    /// The 16 MiB structural decoding allowance for headers, tables, and
+    /// section names is exhausted.
+    #[error("{message}")]
+    Structure {
+        /// Upstream failure text.
+        message: String,
+    },
+    /// The caller-selected `max_entries` budget is exhausted.
+    #[error("Kernel module entries exceed the {max_entries}-entry budget.")]
+    Capacity {
+        /// The caller-selected `max_entries`.
+        max_entries: u64,
+    },
+    /// The image exceeds the operation's input ceiling.
+    #[error("{message}")]
+    FileSize {
+        /// Failure text.
         message: String,
     },
 }
