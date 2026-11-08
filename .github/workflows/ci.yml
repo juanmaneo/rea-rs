@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [trunk]
+  pull_request:
+    branches: [trunk]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gate:
+    name: cargo xtask ci (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Installs the toolchain and components pinned in rust-toolchain.toml.
+      - run: rustup toolchain install
+      - run: cargo xtask ci
+
+  freebsd:
+    name: Type-check (FreeBSD)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: rustup toolchain install
+      - run: rustup target add x86_64-unknown-freebsd
+      - run: cargo check --workspace --all-targets --target x86_64-unknown-freebsd
